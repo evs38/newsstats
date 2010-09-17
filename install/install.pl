@@ -31,7 +31,7 @@ use DBI;
 my %Options = &ReadOptions('');
 
 ### change working directory to .. (as we're in .../install)
-chdir '..';
+chdir dirname($0).'/..';
 
 ### read configuration
 print("Reading configuration.\n");
