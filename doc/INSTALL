@@ -1,0 +1,128 @@
+NewsStats 0.1  (c) 2010 Thomas Hochstein <thh@inter.net>
+
+NewsStats is a software package for gathering statistical data live
+from a Usenet feed and subsequent examination.
+
+This script package is free software; you can redistribute it and/or
+modify it under the terms of the GNU Public License as published by
+the Free Software Foundation.
+
+---------------------------------------------------------------------
+
+INSTALLATION INSTRUCTIONS
+
+1) Install the scripts
+
+   * Download the current version of NewsStats from
+     <http://th-h.de/download/scripts.php>.
+
+   * Untar it into a directory of your choice:
+
+     # tar -xzf newsstats-nn.tar.gz
+
+     Scripts in this path should be executable by the news user.
+
+2) Configuration
+
+   * Copy the sample configuration file newsstats.conf.sample to
+     newsstats.conf and modify it for your purposes:
+
+     # cp newsstats.conf.sample newsstats.conf
+     # vim newsstats.conf
+
+   a) Mandatory configuration options
+
+   * DBDriver = mysql
+     Database driver used; currently only mysql is supported.
+ 
+   * DBHost = localhost
+     The host your mysql server is running on.
+
+   * DBUser =
+     The username to connect to the database server.
+
+   * DBPw = 
+     Matching password for your username.
+
+   * DBDatabase = newsstats
+     Database name.
+
+   NewsStats will use those credentials to connect to your mysql
+   installation.
+
+   * DBTableRaw = raw_de
+     Table holding raw statistical data.
+
+   * DBTableGrps = groups_de
+     Table holding data on postings per group.
+
+   b) Optional configuration options
+
+   * TLH = de
+     Limit examination to that top-level hierarchy.
+     
+3) Database (mysql) setup
+
+   * Setup your database server with a username, password and
+     database matching the NewsStats configuration (see 2 a).
+
+   * Start the installation script:
+     
+     # install/install.pl
+
+     It will setup the necessary database tables and display some 
+     information on the next steps.
+
+4) Feed (INN) setup
+
+   You have to setup an INN feed to feedlog.pl.
+
+   * Edit your 'newsfeeds' file and insert something like
+
+     ## gather statistics for NewsStats
+     newsstats!
+             :!*,de.*
+             :Tc,WmtfbsPNH,Ac:/path/to/feedlog.pl
+
+   * You should only feed that hierarchy (those hierarchies ...) to
+     feedlog.pl you'll want to cover with your statistical
+     examination. It may be a good idea to setup different feeds (to
+     different databases ...) for different hierarchies.
+
+   * Please double check that your path to feedlog.pl is correct and
+     feedlog.pl can be executed by the news user
+
+   * Check your 'newsfeeds' syntax:
+
+     # ctlinnd checkfile
+
+   * Reload 'newsfeeds':
+
+     # ctlinnd reload newsfeeds 'Adding newsstats! feed'
+
+   * Watch your 'news.notice' and 'errlog' files:
+
+     # tail -f /var/log/news/news.notice
+     ...
+     # tail -f /var/log/news/errlog
+
+   Everything should be going smoothly now.
+
+   * If INN is spewing error messages to 'errlog' or reporting
+     continous respaws of feedlog.pl to 'news.notice', stop your feed:
+
+     # ctlinnd drop 'newsstats!'
+
+     and investigate. 'errlog' may be helpful here.
+
+   * You can restart the feed with
+
+     # ctlinnd begin 'newsstats!'
+
+     later.
+
+You should be done now.
+
+Just have a look at your raw data (DBTableRaw). It should now start to
+fill up.
+

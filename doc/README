@@ -1,0 +1,94 @@
+NewsStats 0.1  (c) 2010 Thomas Hochstein <thh@inter.net>
+
+NewsStats is a software package for gathering statistical data live
+from a Usenet feed and subsequent examination.
+
+This script package is free software; you can redistribute it and/or
+modify it under the terms of the GNU Public License as published by
+the Free Software Foundation.
+
+---------------------------------------------------------------------
+
+What's that?
+
+    There's a multitude of tools for the statistical examination of
+    newsgroups: number of postings month or per person, longest
+    threads, and so on (see <http://th-h.de/infos/usenet/stats.php>
+    [German language] for an incomplete list). Most of them use a per-
+    newsgroup approach while NewsStats is hierarchy oriented.
+
+    NewsStats will accumulate data from a live INN feed, allowing you
+    to process the saved information later on.
+
+Workflow
+
+    NewsStats saves overview data and complete headers of (all)
+    incoming postings to a (MySQL) database in real time.
+
+    That raw data will be regularly - e.g. monthly - processed to a
+    second set of database tables each dedicated to a certain
+    statistical aspect, e.g. number of postings per group per month.
+
+    Several kinds of reports can then be generated from those result
+    tables.
+
+Prerequisites
+
+    NewsStats is written in Perl (5.8.x and above) and makes use of a
+    MySQL database, so you'll need Perl, some modules, mysql and, of
+    course, an INN.
+
+    * Perl 5.8.x with standard modules
+      - Cwd
+      - File::Basename
+      - Sys::Syslog
+
+    * Perl modules form CPAN
+      - Cofing::Auto
+      - Date::Format
+      - DBI
+
+    * mysql 5.0.x
+
+    * working installation of INN
+
+Installation instructions
+
+    See INSTALL.   
+
+Getting Started
+
+    'feedlog.pl' will continuously feed raw data to your raw data
+    table. See the feedlog.pl man page for more information.
+
+    You can process that data via 'gatherstats.pl'; currently only the
+    tabulation of postings per group per month is supported. More to
+    come. See the gatherstats.pl man page for more information.
+
+    Report generation is handled by specialised scripts for each
+    report type. Currently only reports on the number of postings per
+    group per month are supported; you can use 'groupstats.pl' for
+    that. See the groupstats.pl man page for more information.
+
+Reporting Bugs
+
+    You can report bugs or feature requests to the author by using the
+    bug tracker at <http://bugs.th-h.de/>.
+
+More Information
+
+    This program is maintained using the Git version control system.
+    You may clone <git://code.th-h.de/usenet/newsstats.git> to check
+    out the current development tree or browse it on the web via
+    <http://code.th-h.de/?p=usenet/newsstats.git>.
+
+Related projects
+
+    <http://usenet.dex.de/> is a site were data gathered via NewsStats
+    is used for a graphical presentation of activity in the de.*
+    Usenet hierarchy over the years.
+
+Author
+
+    Thomas Hochstein <thh@inter.net>
+    <http://th-h.de/>
