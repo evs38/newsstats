@@ -1,0 +1,19 @@
+### database configuration
+#
+# driver, host, credentials and database
+#
+DBDriver   = mysql
+DBHost     = localhost
+DBUser     = 
+DBPw       = 
+DBDatabase = newsstats
+#
+# tables
+#
+DBTableRaw   = raw_de
+DBTableGrps  = groups_de
+#DBTableClnts =
+#DBTableHosts =
+
+### hierarchy configuration
+TLH = de
