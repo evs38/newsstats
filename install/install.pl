@@ -150,3 +150,108 @@ Enjoy!
 
 -thh <thh\@inter.net>
 TODO
+
+__END__
+
+################################ Documentation #################################
+
+=head1 NAME
+
+install - installation script
+
+=head1 SYNOPSIS
+
+B<install> [B<-Vh>]
+
+=head1 REQUIREMENTS
+
+See doc/README: Perl 5.8.x itself and the following modules from CPAN:
+
+=over 2
+
+=item -
+
+Config::Auto
+
+=item -
+
+DBI
+
+=back
+
+=head1 DESCRIPTION
+
+This script will create database tables as necessary and configured.
+
+=head2 Configuration
+
+F<install.pl> will read its configuration from F<newsstats.conf> via
+Config::Auto.
+
+See doc/INSTALL for an overview of possible configuration options.
+
+=head1 OPTIONS
+
+=over 3
+
+=item B<-V> (version)
+
+Print out version and copyright information on B<yapfaq> and exit.
+
+=item B<-h> (help)
+
+Print this man page and exit.
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<install.pl>
+
+The script itself.
+
+=item F<NewsStats.pm>
+
+Library functions for the NewsStats package.
+
+=item F<newsstats.conf>
+
+Runtime configuration file for B<yapfaq>.
+
+=back
+
+=head1 BUGS
+
+Please report any bugs or feature requests to the author or use the
+bug tracker at L<http://bugs.th-h.de/>!
+
+=head1 SEE ALSO
+
+=over 2
+
+=item -
+
+doc/README
+
+=item -
+
+doc/INSTALL
+
+=back
+
+This script is part of the B<NewsStats> package.
+
+=head1 AUTHOR
+
+Thomas Hochstein <thh@inter.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+
+This program is free software; you may redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=cut

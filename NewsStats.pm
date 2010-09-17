@@ -58,8 +58,8 @@ our $MyVersion = "$MySelf $::VERSION (NewsStats.pm $VERSION)";
 ################################################################################
 sub ReadOptions {
 ################################################################################
-### read commandline options and act on standard options
-### IN : $Params: containing list of commandline paramaters (without -h and -V)
+### read commandline options and act on standard options -h and -V
+### IN : $Params: list of legal commandline paramaters (without -h and -V)
 ### OUT: a hash containing the commandline options
   $Getopt::Std::STANDARD_HELP_VERSION = 1;
 
@@ -116,7 +116,9 @@ sub OverrideConfig  {
 ###      $OverrideR: reference to a hash containing overrides
   my ($ConfigR,$OverrideR) = @_;
   my %Override = %$OverrideR;
+  # Config hash empty?
   warn "$MySelf W: Empty configuration hash passed to OverrideConfig().\n" if ( keys %$ConfigR < 1);
+  # return if no overrides
   return if (keys %Override < 1 or keys %$ConfigR < 1);
   foreach my $Key (keys %Override) {
     $$ConfigR{$Key} = $Override{$Key};
@@ -129,7 +131,7 @@ sub InitDB {
 ################################################################################
 ### initialise database connection
 ### IN : $ConfigR: reference to configuration hash
-###      $Die    : if TRUE, die if connection failed
+###      $Die    : if TRUE, die if connection fails
 ### OUT: DBHandle
   my ($ConfigR,$Die) = @_;
   my %Conf = %$ConfigR;
@@ -147,8 +149,10 @@ sub InitDB {
 ################################################################################
 sub ListNewsgroups {
 ################################################################################
-### count each newsgroup and each hierarchy level, but only once
-### IN : $Newsgroups: a list of newsgroups (content of Newsgroups:)
+### explode a (scalar) list of newsgroup names to a list of newsgroup and
+### hierarchy names where every newsgroup and hierarchy appears only once:
+### de.alt.test,de.alt.admin -> de.ALL, de.alt.ALL, de.alt.test, de.alt.admin
+### IN : $Newsgroups: a list of newsgroups (content of Newsgroups: header)
 ### OUT: %Newsgroups: hash containing all newsgroup and hierarchy names as keys
   my ($Newsgroups) = @_;
   my %Newsgroups;
@@ -171,7 +175,8 @@ sub ListNewsgroups {
 ################################################################################
 sub ParseHierarchies {
 ################################################################################
-### get all hierarchies a newsgroup belongs to
+### return a list of all hierarchy levels a newsgroup belongs to
+### (for de.alt.test.moderated that would be de/de.alt/de.alt.test)
 ### IN : $Newsgroup  : a newsgroup name
 ### OUT: @Hierarchies: array containing all hierarchies the newsgroup belongs to
   my ($Newsgroup) = @_;
@@ -194,9 +199,11 @@ sub ParseHierarchies {
 ################################################################################
 sub GetTimePeriod {
 ################################################################################
-### get time period using -m / -p
+### get a time period to act on, in order of preference: by default the
+### last month; or a month submitted by -m YYYY-MM; or a time period submitted
+### by -p YYYY-MM:YYYY-MM
 ### IN : $Month,$Period: contents of -m and -p
-### OUT: $StartMonth, $EndMonth
+### OUT: $StartMonth, $EndMonth (identical if period is just one month)
   my ($Month,$Period) = @_;
   # exit if -m is set and not like YYYY-MM
   die "$MySelf: E: Wrong date format - use '$MySelf -m YYYY-MM'!\n" if not &CheckMonth($Month);
@@ -220,7 +227,7 @@ sub GetTimePeriod {
 ################################################################################
 sub LastMonth {
 ################################################################################
-### get last month from today in YYYY-MM format
+### get last month from todays date in YYYY-MM format
 ### OUT: last month as YYYY-MM
   # get today's date
   my (undef,undef,undef,undef,$Month,$Year,undef,undef,undef) = localtime(time);
@@ -237,7 +244,7 @@ sub LastMonth {
 ################################################################################
 sub CheckMonth {
 ################################################################################
-### check for valid month
+### check if input is a valid month in YYYY-MM form
 ### IN : $Month: month
 ### OUT: TRUE / FALSE
   my ($Month) = @_;
@@ -248,7 +255,7 @@ sub CheckMonth {
 ################################################################################
 sub SplitPeriod {
 ################################################################################
-### split a time period YYYY-MM:YYYY-MM into start and end month
+### split a time period denoted by YYYY-MM:YYYY-MM into start and end month
 ### IN : $Period: time period
 ### OUT: $StartMonth, Â$EndMonth
   my ($Period) = @_;
@@ -265,7 +272,7 @@ sub SplitPeriod {
 ################################################################################
 sub ListMonth {
 ################################################################################
-### return a list of month (YYYY-MM) between start and end month
+### return a list of months (YYYY-MM) between start and end month
 ### IN : $StartMonth, $EndMonth
 ### OUT: @Months: array containing all months from $StartMonth to $EndMonth
   my ($StartMonth, $EndMonth) = @_;
@@ -293,12 +300,11 @@ sub ListMonth {
 ################################################################################
 sub OutputData {
 ################################################################################
-### output information with formatting from DBHandle
+### read database query results from DBHandle and print results with formatting
 ### IN : $Format : format specifier
 ###      $DBQuery: database query handle with executed query,
 ###                containing $Month, $Key, $Value
 ###      $PadGroup: padding length for newsgroups field (optional) for 'pretty'
-### OUT: $Output: formatted output
   my ($Format, $DBQuery,$PadGroup) = @_;
   while (my ($Month, $Key, $Value) = $DBQuery->fetchrow_array) {
     print &FormatOutput($Format, $Month, $Key, $Value, $PadGroup);
@@ -308,12 +314,12 @@ sub OutputData {
 ################################################################################
 sub FormatOutput {
 ################################################################################
-### format information for output
+### format information for output according to format specifier
 ### IN : $Format  : format specifier
-###      $PadGroup: padding length for newsgroups field (optional) for 'pretty'
 ###      $Month   : month (as YYYY-MM)
 ###      $Key     : newsgroup, client, ...
 ###      $Value   : number of postings with that attribute
+###      $PadGroup: padding length for key field (optional) for 'pretty'
 ### OUT: $Output: formatted output
   my ($Format, $Month, $Key, $Value, $PadGroup) = @_;
 
@@ -324,6 +330,7 @@ sub FormatOutput {
   die "$MySelf: E: Unknown output type '$Format'!\n" if !exists($LegalOutput{$Format});
 
   my ($Output);
+  # keep last month in mind
   our ($LastIteration);
   if ($Format eq 'dump') {
     # output as dump (ng nnnnn)
@@ -348,7 +355,9 @@ sub FormatOutput {
 ################################################################################
 sub SQLHierarchies {
 ################################################################################
-### amend WHERE clause to include hierarchies
+### add exclusion of hierarchy levels (de.alt.ALL) from SQL query by
+### amending the WHERE clause if $ShowHierarchies is false (or don't, if it is
+### true, accordingly)
 ### IN : $ShowHierarchies: boolean value
 ### OUT: SQL code
   my ($ShowHierarchies) = @_;
@@ -358,7 +367,7 @@ sub SQLHierarchies {
 ################################################################################
 sub GetMaxLenght {
 ################################################################################
-### get length of longest field in query
+### get length of longest field in future query result
 ### IN : $DBHandle   : database handel
 ###      $Table      : table to query
 ###      $Field      : field to check
@@ -375,7 +384,8 @@ sub GetMaxLenght {
 ################################################################################
 sub SQLGroupList {
 ################################################################################
-### create part of WHERE clause for list of newsgroups separated by :
+### explode list of newsgroups separated by : (with wildcards) to a SQL WHERE
+### clause
 ### IN : $Newsgroups: list of newsgroups (group.one.*:group.two:group.three.*)
 ### OUT: SQL code, list of newsgroups
   my ($Newsgroups) = @_;
