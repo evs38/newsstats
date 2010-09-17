@@ -200,6 +200,8 @@ sub GetTimePeriod {
   my ($Month,$Period) = @_;
   # exit if -m is set and not like YYYY-MM
   die "$MySelf: E: Wrong date format - use '$MySelf -m YYYY-MM'!\n" if not &CheckMonth($Month);
+  # warn if -m and -p is set
+  warn "$MySelf: W: Time period assigned by '-p' takes precendece over month assigned by '-m'.\n" if ($Month && $Period);
   # default: set -m to last month
   $Month = &LastMonth if (!defined($Month) and !defined($Period));
   # set $StartMonth, $EndMonth
