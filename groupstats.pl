@@ -40,7 +40,27 @@ my %ConfOverride;
 $ConfOverride{'DBTableGrps'}  = $Options{'g'} if $Options{'g'};
 &OverrideConfig(\%Conf,\%ConfOverride);
 
-### default output type to 'dump'
+### check for incompatible command line options
+# you can't mix '-t', '-b' and '-l'
+# -b/-l take preference over -t, and -b takes preference over -l
+if ($Options{'b'} or $Options{'l'}) {
+  if ($Options{'t'}) {
+    # drop -t
+    warn ("$MySelf: W: You cannot combine thresholds (-t) and top lists (-b) or levels (-l). Threshold '-t $Options{'t'}' was ignored.\n");
+    undef($Options{'t'});
+  };
+  if ($Options{'b'} and $Options{'l'}) {
+    # drop -l
+    warn ("$MySelf: W: You cannot combine top lists (-b) and levels (-l). Level '-l $Options{'l'}' was ignored.\n");
+    undef($Options{'l'});
+  };
+  # -q/-d don't work with -b or -l
+  warn ("$MySelf: W: Sorting by number of postings (-q) ignored due to top list mode (-b) / levels (-l).\n") if $Options{'q'};
+  warn ("$MySelf: W: Reverse sorting (-d) ignored due to top list mode (-b) / levels (-l).\n") if $Options{'d'};
+};
+
+### check output type
+# default output type to 'dump'
 $Options{'o'} = 'dump' if !$Options{'o'};
 # fail if more than one newsgroup is combined with 'dumpgroup' type
 die ("$MySelf: E: You cannot combine newsgroup lists (-n) with more than one group with '-o dumpgroup'!\n") if ($Options{'o'} eq 'dumpgroup' and defined($Options{'n'}) and $Options{'n'} =~ /:|\*/);
@@ -49,14 +69,10 @@ if ($Options{'o'} eq 'dumpgroup' and !defined($Options{'n'})) {
   $Options{'o'} = 'dump';
   warn ("$MySelf: W: You must submit exactly one newsgroup ('-n news.group') for '-o dumpgroup'. Output type was set to 'dump'.\n");
 };
-# you can't mix '-t' and '-b'
-if ($Options{'b'}) {
-  if ($Options{'t'}) {
-    warn ("$MySelf: W: You cannot combine thresholds (-t) and top lists (-b). Threshold '-t $Options{'t'}' was ignored.\n");
-    undef($Options{'t'});
-  };
-  warn ("$MySelf: W: Sorting by number of postings (-q) ignored due to top list mode (-b).\n") if $Options{'q'};
-  warn ("$MySelf: W: Reverse sorting (-d) ignored due to top list mode (-b).\n") if $Options{'d'};
+# set output type to 'pretty' for -l
+if ($Options{'l'}) {
+  $Options{'o'} = 'pretty';
+  warn ("$MySelf: W: Output type forced to '-o pretty' due to usage of '-l'.\n");
 };
 
 ### get query type, default to 'postings'
