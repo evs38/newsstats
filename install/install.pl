@@ -96,8 +96,8 @@ Things left to do:
    a) Edit your 'newsfeeds' file and insert something like
 
           ## gather statistics for NewsStats
-          newsstats!\
-                  :!*,de.*\
+          newsstats!\\
+                  :!*,de.*\\
                   :Tc,WmtfbsPNH,Ac:$Path/feedlog.pl
 
       Please
