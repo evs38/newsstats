@@ -28,10 +28,11 @@ use DBI;
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('');
+my %Options = &ReadOptions('u:');
 
 ### change working directory to .. (as we're in .../install)
 chdir dirname($0).'/..';
+my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
@@ -82,35 +83,12 @@ CREATE TABLE IF NOT EXISTS `$Conf{'DBTableGrps'}` (
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='Postings per newsgroup';
 GRPS
 
-##### --------------------------- End of definitions ---------------------------
+##### --------------------------------------------------------------------------
+##### Installation / upgrade instructions
+##### --------------------------------------------------------------------------
 
-### create database tables
-print "-----\nStarting database table generation.\n";
-# DB init
-my $DBHandle = InitDB(\%Conf,1);
-
-# read tables
-my %TablesInDB = %{$DBHandle->table_info('%', '%', '%', 'TABLE')->fetchall_hashref('TABLE_NAME')};
-
-# check for tables and create them, if they don't exist yet
-foreach my $Table (keys %DBCreate) {
-  if (defined($TablesInDB{$Conf{$Table}})) {
-    printf("Database table %s.%s already exists, skipping ....\n",$Conf{'DBDatabase'},$Conf{$Table});
-    next;
-  };
-  my $DBQuery = $DBHandle->prepare($DBCreate{$Table});
-  $DBQuery->execute() or die sprintf("$MySelf: E: Can't create table %s in database %s: %s%\n",$Table,$Conf{'DBDatabase'},$DBI::errstr);
-  printf("Database table %s.%s created succesfully.\n",$Conf{'DBDatabase'},$Conf{$Table});
-};
-
-# close handle
-$DBHandle->disconnect;
-print "Database table generation done.\n";
-
-### output information on other necessary steps
-my $Path = cwd();
-print <<TODO;
------
+my $Install = <<INSTALL;
+----------
 Things left to do:
 
 1) Setup an INN feed to feedlog.pl
@@ -149,7 +127,102 @@ Things left to do:
 Enjoy!
 
 -thh <thh\@inter.net>
-TODO
+INSTALL
+
+my $Upgrade = <<UPGRADE;
+----------
+Your installation was upgraded from $Options{'u'} to $PackageVersion.
+
+Don't forget to restart your INN feed so that it can pick up the new version:
+
+   # ctlinnd begin 'newsstats!'
+
+(or whatever you called your feed).
+UPGRADE
+
+##### --------------------------------------------------------------------------
+##### Upgrading
+##### --------------------------------------------------------------------------
+my (%DBUpgrade,%Instructions);
+
+# 0.01 -> 0.02
+$DBUpgrade{'0.02'}     = <<DB0point02;
+SELECT 1;
+DB0point02
+$Instructions{'0.02'}  = <<IN0point02;
+Dummy Instructions.
+IN0point02
+
+##### --------------------------- End of definitions ---------------------------
+
+### DB init, read list of tables
+print "Reading database information.\n";
+my $DBHandle = InitDB(\%Conf,1);
+my %TablesInDB = %{$DBHandle->table_info('%', '%', '%', 'TABLE')->fetchall_hashref('TABLE_NAME')};
+
+if (!$Options{'u'}) {
+  ##### installation mode
+  print "----------\nStarting database table generation.\n";
+  # check for tables and create them, if they don't exist yet
+  foreach my $Table (keys %DBCreate) {
+    &CreateTable($Table);
+  };
+  print "Database table generation done.\n";
+ 
+  # Display install instructions
+  print $Install;
+} else {
+  ##### upgrade mode
+  print "----------\nStarting upgrade process.\n";
+  if ($Options{'u'} < $PackageVersion) {
+    # Database upgrades for each version
+    foreach my $UpVersion (sort keys %DBUpgrade) {
+      if ($UpVersion > $Options{'u'} and $UpVersion <= $PackageVersion) {
+        print "v$UpVersion: Executing database upgrade ...\n"; 
+        &DoMySQL($DBUpgrade{$UpVersion});
+      };
+    };
+    # Display upgrade instructions for each version
+    foreach my $UpVersion (sort keys %Instructions) {
+      if ($UpVersion > $Options{'u'} and $UpVersion <= $PackageVersion) {
+        print "v$UpVersion: Upgrade Instructions >>>>>\n";
+        my $Padding = ' ' x (length($UpVersion) + 3);
+        $Instructions{$UpVersion} =~ s/^/$Padding/;
+        print $Instructions{$UpVersion};
+        print "<" x (length($UpVersion) + 29) . "\n";
+      };
+    };
+  };
+  # Display upgrade instructions
+  print $Upgrade;
+};
+
+# close handle
+$DBHandle->disconnect;
+
+exit(0);
+
+################################# Subroutines ##################################
+
+sub CreateTable() {
+  my $Table = shift;
+  if (defined($TablesInDB{$Conf{$Table}})) {
+    printf("Database table %s.%s already exists, skipping ....\n",$Conf{'DBDatabase'},$Conf{$Table});
+    return;
+  };
+  my $DBQuery = $DBHandle->prepare($DBCreate{$Table});
+  $DBQuery->execute() or die sprintf("$MySelf: E: Can't create table %s in database %s: %s%\n",$Table,$Conf{'DBDatabase'},$DBI::errstr);
+  printf("Database table %s.%s created succesfully.\n",$Conf{'DBDatabase'},$Conf{$Table});
+  return;
+};
+
+sub DoMySQL() {
+  my $SQL = shift;
+  my $DBQuery = $DBHandle->prepare($SQL);
+  $DBQuery->execute() or warn sprintf("$MySelf: E: Database error: %s\n",$DBI::errstr);
+  return;
+};
+
 
 __END__
 

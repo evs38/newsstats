@@ -18,6 +18,7 @@ require Exporter;
 @EXPORT = qw(
   $MySelf
   $MyVersion
+  $PackageVersion
   ReadOptions
   ReadConfig
   OverrideConfig
@@ -40,6 +41,7 @@ require Exporter;
                  Output      => [qw(OutputData FormatOutput)],
                  SQLHelper   => [qw(SQLHierarchies SQLGroupList GetMaxLenght)]);
 $VERSION = '0.1';
+our $PackageVersion = '0.1';
 
 use Data::Dumper;
 use File::Basename;
@@ -82,7 +84,7 @@ sub ReadOptions {
 sub ShowVersion {
 ################################################################################
 ### display version and exit
-  print "$MyVersion\nCopyright (c) 2010 Thomas Hochstein <thh\@inter.net>\n";
+  print "NewsStats v$PackageVersion\n$MyVersion\nCopyright (c) 2010 Thomas Hochstein <thh\@inter.net>\n";
   print "This program is free software; you may redistribute it and/or modify it under the same terms as Perl itself.\n";
   exit(100);
 };
