@@ -40,8 +40,8 @@ require Exporter;
 %EXPORT_TAGS = ( TimePeriods => [qw(GetTimePeriod LastMonth CheckMonth SplitPeriod ListMonth)],
                  Output      => [qw(OutputData FormatOutput)],
                  SQLHelper   => [qw(SQLHierarchies SQLGroupList GetMaxLenght)]);
-$VERSION = '0.1';
-our $PackageVersion = '0.1';
+$VERSION = '0.01';
+our $PackageVersion = '0.01';
 
 use Data::Dumper;
 use File::Basename;
