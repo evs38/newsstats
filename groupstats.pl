@@ -75,8 +75,8 @@ if ($Options{'l'}) {
 my ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
 # reset to one month for 'dump' output type
 if ($Options{'o'} eq 'dump' and $Options{'p'}) {
-  $StartMonth = $EndMonth;
-  warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump'. Month was set to $StartMonth.\n");
+  warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o pretty'.\n");
+  $Options{'o'} = 'pretty';
 };
 
 ### init database
@@ -136,6 +136,8 @@ if (!defined($Options{'b'}) and !defined($Options{'l'})) {
   } else {
     $OrderClause = 'postings DESC';
   };
+  # set -b to 10 if < 1 (Top 10)
+  $Options{'b'} = 10 if $Options{'b'} !~ /^\d*$/ or $Options{'b'} < 1;
   # push LIMIT to GroupList to match number of binding vars for DBQuery->execute
   push @GroupList,$Options{'b'};
   # prepare query: get sum of postings per group from groups table for given months and newsgroups with LIMIT
