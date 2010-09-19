@@ -140,19 +140,6 @@ Don't forget to restart your INN feed so that it can pick up the new version:
 (or whatever you called your feed).
 UPGRADE
 
-##### --------------------------------------------------------------------------
-##### Upgrading
-##### --------------------------------------------------------------------------
-my (%DBUpgrade,%Instructions);
-
-# 0.01 -> 0.02
-$DBUpgrade{'0.02'}     = <<DB0point02;
-SELECT 1;
-DB0point02
-$Instructions{'0.02'}  = <<IN0point02;
-Dummy Instructions.
-IN0point02
-
 ##### --------------------------- End of definitions ---------------------------
 
 ### DB init, read list of tables
@@ -174,26 +161,17 @@ if (!$Options{'u'}) {
 } else {
   ##### upgrade mode
   print "----------\nStarting upgrade process.\n";
+  $PackageVersion = '0.03';
   if ($Options{'u'} < $PackageVersion) {
-    # Database upgrades for each version
-    foreach my $UpVersion (sort keys %DBUpgrade) {
-      if ($UpVersion > $Options{'u'} and $UpVersion <= $PackageVersion) {
-        print "v$UpVersion: Executing database upgrade ...\n"; 
-        &DoMySQL($DBUpgrade{$UpVersion});
-      };
-    };
-    # Display upgrade instructions for each version
-    foreach my $UpVersion (sort keys %Instructions) {
-      if ($UpVersion > $Options{'u'} and $UpVersion <= $PackageVersion) {
-        print "v$UpVersion: Upgrade Instructions >>>>>\n";
-        my $Padding = ' ' x (length($UpVersion) + 3);
-        $Instructions{$UpVersion} =~ s/^/$Padding/;
-        print $Instructions{$UpVersion};
-        print "<" x (length($UpVersion) + 29) . "\n";
-      };
+    if ($Options{'u'} < 0.02) {
+      # 0.01 -> 0.02
+      # &DoMySQL('...;');
+      # print "v0.02: Database upgrades ...\n";
+      # &PrintInstructions('0.02',<<"      INSTRUCTIONS");
+      # INSTRUCTIONS
     };
   };
-  # Display upgrade instructions
+  # Display general upgrade instructions
   print $Upgrade;
 };
 
@@ -204,7 +182,7 @@ exit(0);
 
 ################################# Subroutines ##################################
 
-sub CreateTable() {
+sub CreateTable {
   my $Table = shift;
   if (defined($TablesInDB{$Conf{$Table}})) {
     printf("Database table %s.%s already exists, skipping ....\n",$Conf{'DBDatabase'},$Conf{$Table});
@@ -216,11 +194,20 @@ sub CreateTable() {
   return;
 };
 
-sub DoMySQL() {
+sub DoMySQL {
   my $SQL = shift;
   my $DBQuery = $DBHandle->prepare($SQL);
   $DBQuery->execute() or warn sprintf("$MySelf: E: Database error: %s\n",$DBI::errstr);
   return;
+};
+
+sub PrintInstructions {
+  my ($UpVersion,$Instructions) = @_;
+  print "v$UpVersion: Upgrade Instructions >>>>>\n";
+  my $Padding = ' ' x (length($UpVersion) + 3);
+    $Instructions =~ s/^      /$Padding/mg;
+    print $Instructions;
+    print "<" x (length($UpVersion) + 29) . "\n";
 };
 
 
