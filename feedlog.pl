@@ -77,7 +77,7 @@ while (<>) {
   };
   $DBQuery->finish;
   
-  warn sprintf("-----\nDay: %s\nDate: %s\nMID: %s\nTS: %s\nToken: %s\nSize: %s\nPeer: %s\nPath: %s\nNewsgroups: %s\nHeaders: %s\n",$Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path, $Newsgroups, $Headers) if !$Options{'d'};
+  warn sprintf("-----\nDay: %s\nDate: %s\nMID: %s\nTS: %s\nToken: %s\nSize: %s\nPeer: %s\nPath: %s\nNewsgroups: %s\nHeaders: %s\n",$Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path, $Newsgroups, $Headers) if $Options{'d'};
 }
 
 ### close handles
