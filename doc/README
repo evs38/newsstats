@@ -44,7 +44,7 @@ Prerequisites
       - Sys::Syslog
 
     * Perl modules form CPAN
-      - Cofing::Auto
+      - Config::Auto
       - Date::Format
       - DBI
 
@@ -68,11 +68,11 @@ Getting Started
     Report generation is handled by specialised scripts for each
     report type. Currently only reports on the number of postings per
     group per month are supported; you can use 'groupstats.pl' for
-    that. See the groupstats.pl man page for more information.
+    this. See the groupstats.pl man page for more information.
 
 Reporting Bugs
 
-    You can report bugs or feature requests to the author by using the
+    You can report bugs or feature requests to the author using the
     bug tracker at <http://bugs.th-h.de/>.
 
 More Information
@@ -86,7 +86,7 @@ Related projects
 
     <http://usenet.dex.de/> is a site were data gathered via NewsStats
     is used for a graphical presentation of activity in the de.*
-    Usenet hierarchy over the years.
+    Usenet hierarchy over the years (since 1992).
 
 Author
 
