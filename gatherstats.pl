@@ -134,7 +134,11 @@ DBI
 
 This script will extract and process statistical information from a
 database table which is fed from F<feedlog.pl> for a given time period
-and write its results to (an)other database table(s).
+and write its results to (an)other database table(s). Entries marked
+with I<'disregard'> in the database will be ignored; currently, you have
+to set this flag yourself, using your database management tools. You
+can exclude erroneous entries that way (e.g. automatic reposts (think
+of cancels flood and resurrectors); spam; ...).
 
 The time period to act on defaults to last month; you can assign
 another month via the B<-m> switch or a time period via the B<-p>
