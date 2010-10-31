@@ -179,8 +179,13 @@ $DBQuery->execute($StartMonth,$EndMonth,@GroupList,@Params)
 
 # output results
 # print caption (-c) with time period if -m or -p is set
-# FIXME - month or period should handled differently
-printf ("----- Report from %s to %s\n",$StartMonth,$EndMonth) if $Options{'c'} and ($Options{'m'} or $Options{'p'});
+if ($Options{'c'}) {
+  if ($Options{'p'}) {
+    printf ("----- Report from %s to %s\n",$StartMonth,$EndMonth);
+  } elsif ($Options{'m'}) {
+    printf ("----- Report for %s\n",$StartMonth);
+  };
+};
 # print caption (-c) with newsgroup list if -n is set
 printf ("----- Newsgroups: %s\n",join(',',split(/:/,$Newsgroups))) if $Options{'c'} and $Options{'n'};
 # print caption (-c) with threshold if -t is set, taking -i in account
@@ -192,16 +197,16 @@ if (!defined($Options{'b'})  and !defined($Options{'l'})) {
   # -b is set (then -l can't be!)
   # we have to read in the query results ourselves, as they do not have standard layout
   while (my ($Newsgroup,$Postings) = $DBQuery->fetchrow_array) {
-    # we just assign "top x" or "bottom x" instead of a month for the caption
-    # FIXME
-    print &FormatOutput($Options{'o'}, ($Options{'i'} ? 'Bottom ' : 'Top ').$Options{'b'}, $Newsgroup, $Postings, $MaxLength);
+    # we just assign "top x" or "bottom x" instead of a month for the caption and force an output type of pretty
+    print &FormatOutput('pretty', ($Options{'i'} ? 'Bottom ' : 'Top ').$Options{'b'}, $Newsgroup, $Postings, $MaxLength);
   };
 } else {
   # -l must be set now, as all other cases have been taken care of
+  # print caption (-c) with level, taking -i in account
+  printf ("----- Newsgroups with %s than %u postings over the whole time period\n",$Options{'i'} ? 'less' : 'more',$Options{'l'}) if $Options{'c'};
   # we have to read in the query results ourselves, as they do not have standard layout
   while (my ($Month,$Newsgroup,$Postings) = $DBQuery->fetchrow_array) {
     # we just switch $Newsgroups and $Month for output generation
-    # FIXME
     print &FormatOutput($Options{'o'}, $Newsgroup, $Month, $Postings, 7);
   };
 };
