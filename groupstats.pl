@@ -117,7 +117,7 @@ if (defined($Options{'t'})) {
 # according to setting of -s
 my $WhereClause = sprintf('month BETWEEN ? AND ? AND %s AND %s %s',$QueryGroupList,$QueryThreshold,&SQLHierarchies($Options{'s'}));
 
-# get lenght of longest newsgroup delivered by query for formatting purposes
+# get length of longest newsgroup delivered by query for formatting purposes
 # FIXME
 my $MaxLength = &GetMaxLenght($DBHandle,$Conf{'DBTableGrps'},'newsgroup',$WhereClause,$StartMonth,$EndMonth,(@GroupList,@Params));
 
@@ -134,7 +134,7 @@ if (!defined($Options{'b'}) and !defined($Options{'l'})) {
   $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE %s ORDER BY month,%s",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$OrderClause));
 } elsif ($Options{'b'}) {
   # -b is set (then -l can't be!)
-  # set sorting order (-i)
+  # set sorting order (-i): top or flop list?
   if ($Options{'i'}) {
     $OrderClause = 'postings';
   } else {
@@ -148,7 +148,7 @@ if (!defined($Options{'b'}) and !defined($Options{'l'})) {
   $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroup,SUM(postings) AS postings FROM %s.%s WHERE %s GROUP BY newsgroup ORDER BY %s,newsgroup LIMIT ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$OrderClause));
 } else {
   # -l must be set now, as all other cases have been taken care of
-  # set sorting order (-i)
+  # which kind of level (-i): more than -l x or less than -l x?
   my ($Level);
   if ($Options{'i'}) {
     $Level = '<';
