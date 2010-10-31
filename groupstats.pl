@@ -155,13 +155,17 @@ if (!defined($Options{'b'}) and !defined($Options{'l'})) {
   } else {
     $Level = '>';
   };
-  # push level and $StartMonth,$EndMonth - again - to Params
-  # FIXME -- together with the query (see below)
-  push @Params,$Options{'l'};
-  push @Params,$StartMonth,$EndMonth;
-  # prepare query: get number of postings per group from groups table for given months and 
-  # FIXME -- this query is ... in dire need of impromevent
-  $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE newsgroup IN (SELECT newsgroup FROM %s.%s WHERE %s GROUP BY newsgroup HAVING MAX(postings) %s ?) AND %s ORDER BY newsgroup,month",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$Level,$WhereClause));
+  # prepare and execute query: get list of newsgroups meeting level condition
+  $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroup FROM %s.%s WHERE %s GROUP BY newsgroup HAVING MAX(postings) %s ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$Level));
+  $DBQuery->execute($StartMonth,$EndMonth,@GroupList,$Options{'l'})
+    or die sprintf("$MySelf: E: Can't get groups data for %s to %s from %s.%s: %s\n",$StartMonth,$EndMonth,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
+  # add newsgroups to a comma-seperated list ready for IN(...) query
+  my $GroupList;
+  while (my ($Newsgroup) = $DBQuery->fetchrow_array) {
+    $GroupList .= ',' if (defined($GroupList) and $GroupList ne '');
+    $GroupList .= "'$Newsgroup'";
+  };
+  $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE newsgroup IN (%s) AND %s ORDER BY newsgroup,month",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$GroupList,$WhereClause));
 };
 
 # execute query
