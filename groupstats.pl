@@ -84,38 +84,42 @@ my $DBHandle = InitDB(\%Conf,1);
 
 ### create report
 # get list of newsgroups (-n)
-my ($QueryPart,@GroupList);
+my ($QueryGroupList,$QueryThreshold,@GroupList,@Params);
 my $Newsgroups = $Options{'n'};
 if ($Newsgroups) {
   # explode list of newsgroups for WHERE clause
-  ($QueryPart,@GroupList) = &SQLGroupList($Newsgroups);
+  ($QueryGroupList,@GroupList) = &SQLGroupList($Newsgroups);
 } else {
   # set to dummy value (always true)
-  $QueryPart = 1;
+  $QueryGroupList = 1;
 };
 
 # manage thresholds
 if (defined($Options{'t'})) {
   if ($Options{'i'}) {
     # -i: list groups below threshold
-    $QueryPart .= ' AND postings < ?';
+    $QueryThreshold .= ' postings < ?';
   } else {
     # default: list groups above threshold
-    $QueryPart .= ' AND postings > ?';
+    $QueryThreshold .= ' postings > ?';
   };
-  # push threshold to GroupList to match number of binding vars for DBQuery->execute
-  push @GroupList,$Options{'t'};
+  # push threshold to Params
+  push @Params,$Options{'t'};
+} else {
+  # set to dummy value (always true)
+  $QueryThreshold = 1;  
 }
 
 # construct WHERE clause
-# $QueryPart is "list of newsgroup" (or 1),
+# $QueryGroupList is "list of newsgroup" (or 1),
+# $QueryThreshold is threshold definition (or 1),
 # &SQLHierarchies() takes care of the exclusion of hierarchy levels (.ALL)
 # according to setting of -s
-my $WhereClause = sprintf('month BETWEEN ? AND ? AND %s %s',$QueryPart,&SQLHierarchies($Options{'s'}));
+my $WhereClause = sprintf('month BETWEEN ? AND ? AND %s AND %s %s',$QueryGroupList,$QueryThreshold,&SQLHierarchies($Options{'s'}));
 
 # get lenght of longest newsgroup delivered by query for formatting purposes
 # FIXME
-my $MaxLength = &GetMaxLenght($DBHandle,$Conf{'DBTableGrps'},'newsgroup',$WhereClause,$StartMonth,$EndMonth,@GroupList);
+my $MaxLength = &GetMaxLenght($DBHandle,$Conf{'DBTableGrps'},'newsgroup',$WhereClause,$StartMonth,$EndMonth,(@GroupList,@Params));
 
 my ($OrderClause,$DBQuery);
 # -b (best of / top list) defined?
@@ -138,29 +142,30 @@ if (!defined($Options{'b'}) and !defined($Options{'l'})) {
   };
   # set -b to 10 if < 1 (Top 10)
   $Options{'b'} = 10 if $Options{'b'} !~ /^\d*$/ or $Options{'b'} < 1;
-  # push LIMIT to GroupList to match number of binding vars for DBQuery->execute
-  push @GroupList,$Options{'b'};
+  # push LIMIT to Params
+  push @Params,$Options{'b'};
   # prepare query: get sum of postings per group from groups table for given months and newsgroups with LIMIT
   $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroup,SUM(postings) AS postings FROM %s.%s WHERE %s GROUP BY newsgroup ORDER BY %s,newsgroup LIMIT ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$OrderClause));
 } else {
   # -l must be set now, as all other cases have been taken care of
   # set sorting order (-i)
+  my ($Level);
   if ($Options{'i'}) {
-    $OrderClause = '<';
+    $Level = '<';
   } else {
-    $OrderClause = '>';
+    $Level = '>';
   };
-  # push level and $StartMonth,$EndMonth - again - to GroupList to match number of binding vars for DBQuery->execute
+  # push level and $StartMonth,$EndMonth - again - to Params
   # FIXME -- together with the query (see below)
-  push @GroupList,$Options{'l'};
-  push @GroupList,$StartMonth,$EndMonth;
+  push @Params,$Options{'l'};
+  push @Params,$StartMonth,$EndMonth;
   # prepare query: get number of postings per group from groups table for given months and 
   # FIXME -- this query is ... in dire need of impromevent
-  $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE newsgroup IN (SELECT newsgroup FROM %s.%s WHERE %s GROUP BY newsgroup HAVING MAX(postings) %s ?) AND %s ORDER BY newsgroup,month",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$OrderClause,$WhereClause));
+  $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE newsgroup IN (SELECT newsgroup FROM %s.%s WHERE %s GROUP BY newsgroup HAVING MAX(postings) %s ?) AND %s ORDER BY newsgroup,month",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$Level,$WhereClause));
 };
 
 # execute query
-$DBQuery->execute($StartMonth,$EndMonth,@GroupList)
+$DBQuery->execute($StartMonth,$EndMonth,@GroupList,@Params)
   or die sprintf("$MySelf: E: Can't get groups data for %s to %s from %s.%s: %s\n",$StartMonth,$EndMonth,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
 
 # output results
