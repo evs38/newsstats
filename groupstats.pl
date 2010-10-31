@@ -73,10 +73,15 @@ if ($Options{'l'}) {
 
 ### get time period
 my ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
-# reset to one month for 'dump' output type
+# if time period is more than one month: set output type to '-o pretty' or '-o dumpgroup'
 if ($Options{'o'} eq 'dump' and $Options{'p'}) {
-  warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o pretty'.\n");
-  $Options{'o'} = 'pretty';
+  if (defined($Options{'n'}) and $Options{'n'} !~ /:|\*/) {
+   warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o dumpgroup'.\n");
+   $Options{'o'} = 'dumpgroup';
+  } else {
+   warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o pretty'.\n");
+   $Options{'o'} = 'pretty';
+  }
 };
 
 ### init database
