@@ -36,11 +36,11 @@ require Exporter;
   FormatOutput
   SQLHierarchies
   SQLGroupList
-  GetMaxLenght
+  GetMaxLength
 );
 %EXPORT_TAGS = ( TimePeriods => [qw(GetTimePeriod LastMonth CheckMonth SplitPeriod ListMonth)],
                  Output      => [qw(OutputData FormatOutput)],
-                 SQLHelper   => [qw(SQLHierarchies SQLGroupList GetMaxLenght)]);
+                 SQLHelper   => [qw(SQLHierarchies SQLGroupList GetMaxLength)]);
 $VERSION = '0.01';
 our $PackageVersion = '0.01';
 
@@ -412,7 +412,7 @@ sub SQLHierarchies {
 };
 
 ################################################################################
-sub GetMaxLenght {
+sub GetMaxLength {
 ################################################################################
 ### get length of longest field in future query result
 ### IN : $DBHandle   : database handel

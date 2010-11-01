@@ -3,7 +3,7 @@
 # groupstats.pl
 #
 # This script will get statistical data on newgroup usage
-# form a database.
+# from a database.
 # 
 # It is part of the NewsStats package.
 #
@@ -151,7 +151,7 @@ my $WhereClause = sprintf('month BETWEEN ? AND ? AND %s AND %s %s',$QueryGroupLi
 
 # get length of longest newsgroup delivered by query for formatting purposes
 # FIXME
-my $MaxLength = &GetMaxLenght($DBHandle,$Conf{'DBTableGrps'},'newsgroup',$WhereClause,$StartMonth,$EndMonth,(@GroupList,@Params));
+my $MaxLength = &GetMaxLength($DBHandle,$Conf{'DBTableGrps'},'newsgroup',$WhereClause,$StartMonth,$EndMonth,(@GroupList,@Params));
 
 my ($OrderClause,$DBQuery);
 # -b (best of / top list) defined?
