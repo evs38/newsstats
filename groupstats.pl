@@ -99,6 +99,8 @@ if ($Options{'a'}) {
 } else {
   ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
 };
+# if -p or -a are set: drop -m
+undef $Options{'m'} if ($Options{'p'} or $Options{'a'});
 # if time period is more than one month: force output type to '-o pretty' or '-o dumpgroup'
 if ($Options{'o'} eq 'dump' and ($Options{'p'} or $Options{'a'})) {
   if (defined($Options{'n'}) and $Options{'n'} !~ /:|\*/) {
@@ -207,10 +209,10 @@ $DBQuery->execute($StartMonth,$EndMonth,@GroupList,@Params)
 undef($Options{'c'}) if $Options{'f'};
 # print caption (-c) with time period if -m or -p is set
 if ($Options{'c'}) {
-  if ($Options{'p'}) {
-    printf ("----- Report from %s to %s\n",$StartMonth,$EndMonth);
-  } elsif ($Options{'m'}) {
+  if ($Options{'m'}) {
     printf ("----- Report for %s\n",$StartMonth);
+  } else {
+    printf ("----- Report from %s to %s %s\n",$StartMonth,$EndMonth,$Options{'a'} ? '(all months)' : '');
   };
 };
 # print caption (-c) with newsgroup list if -n is set
