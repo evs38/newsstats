@@ -156,10 +156,11 @@ sub ListNewsgroups {
 ### hierarchy names where every newsgroup and hierarchy appears only once:
 ### de.alt.test,de.alt.admin -> de.ALL, de.alt.ALL, de.alt.test, de.alt.admin
 ### IN : $Newsgroups  : a list of newsgroups (content of Newsgroups: header)
+###      $TLH         : top level hierarchy (all other newsgroups are ignored)
 ###      $ValidGroupsR: reference to a hash containing all valid newsgroups
 ###                     as keys
 ### OUT: %Newsgroups  : hash containing all newsgroup and hierarchy names as keys
-  my ($Newsgroups,$ValidGroupsR) = @_;
+  my ($Newsgroups,$TLH,$ValidGroupsR) = @_;
   my %ValidGroups = %{$ValidGroupsR} if $ValidGroupsR;
   my %Newsgroups;
   chomp($Newsgroups);
@@ -167,6 +168,8 @@ sub ListNewsgroups {
   $Newsgroups =~ s/\s//;
   # call &HierarchyCount for each newsgroup in $Newsgroups:
   for (split /,/, $Newsgroups) {
+    # don't count newsgroup/hierarchy in wrong TLH
+    next if($TLH and !/^$TLH/);
     # don't count invalid newsgroups
     if(%ValidGroups and !defined($ValidGroups{$_})) {
       warn (sprintf("DROPPED: %s\n",$_));

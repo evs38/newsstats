@@ -77,7 +77,7 @@ foreach my $Month (&ListMonth($StartMonth,$EndMonth)) {
     my %Postings;
     while (($_) = $DBQuery->fetchrow_array) {
       # get list oft newsgroups and hierarchies from Newsgroups:
-      my %Newsgroups = ListNewsgroups($_,$Options{'l'} ? \%ValidGroups : '');
+      my %Newsgroups = ListNewsgroups($_,$Conf{'TLH'},$Options{'l'} ? \%ValidGroups : '');
       # count each newsgroup and hierarchy once
       foreach (sort keys %Newsgroups) {
         $Postings{$_}++;
