@@ -26,7 +26,7 @@ use DBI;
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('m:p:an:o:t:l:b:iscqdg:');
+my %Options = &ReadOptions('m:p:an:o:t:l:b:iscqdf:g:');
 
 ### read configuration
 my %Conf = %{ReadConfig('newsstats.conf')};
@@ -39,7 +39,13 @@ $ConfOverride{'DBTableGrps'}  = $Options{'g'} if $Options{'g'};
 ### check for incompatible command line options
 # you can't mix '-t', '-b' and '-l'
 # -b/-l take preference over -t, and -b takes preference over -l
+# you can't use '-f' with '-b' or '-l'
 if ($Options{'b'} or $Options{'l'}) {
+  if ($Options{'f'}) {
+    # drop -f
+    warn ("$MySelf: W: You cannot save the report to monthly files when using top lists (-b) or levels (-l). Filename template '-f $Options{'f'}' was ignored.\n");
+    undef($Options{'f'});
+  };
   if ($Options{'t'}) {
     # drop -t
     warn ("$MySelf: W: You cannot combine thresholds (-t) and top lists (-b) or levels (-l). Threshold '-t $Options{'t'}' was ignored.\n");
@@ -91,11 +97,13 @@ if ($Options{'a'}) {
 # if time period is more than one month: set output type to '-o pretty' or '-o dumpgroup'
 if ($Options{'o'} eq 'dump' and ($Options{'p'} or $Options{'a'})) {
   if (defined($Options{'n'}) and $Options{'n'} !~ /:|\*/) {
-   warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o dumpgroup'.\n");
-   $Options{'o'} = 'dumpgroup';
-  } else {
-   warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o pretty'.\n");
-   $Options{'o'} = 'pretty';
+    # just one newsgroup is defined
+    warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o dumpgroup'.\n");
+    $Options{'o'} = 'dumpgroup';
+  } elsif (!defined($Options{'f'})) {
+    # more than one newsgroup - and no file output
+    warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o pretty'.\n");
+    $Options{'o'} = 'pretty';
   }
 };
 
@@ -190,6 +198,8 @@ $DBQuery->execute($StartMonth,$EndMonth,@GroupList,@Params)
   or die sprintf("$MySelf: E: Can't get groups data for %s to %s from %s.%s: %s\n",$StartMonth,$EndMonth,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
 
 # output results
+# reset caption (-c) if -f is set
+undef($Options{'c'}) if $Options{'f'};
 # print caption (-c) with time period if -m or -p is set
 if ($Options{'c'}) {
   if ($Options{'p'}) {
@@ -204,7 +214,7 @@ printf ("----- Newsgroups: %s\n",join(',',split(/:/,$Newsgroups))) if $Options{'
 printf ("----- Threshold: %s %u\n",$Options{'i'} ? '<' : '>',$Options{'t'}) if $Options{'c'} and $Options{'t'};
 if (!defined($Options{'b'})  and !defined($Options{'l'})) {
   # default: neither -b nor -l
-  &OutputData($Options{'o'},$DBQuery,$MaxLength);
+  &OutputData($Options{'o'},$Options{'f'},$DBQuery,$MaxLength);
 } elsif ($Options{'b'}) {
   # -b is set (then -l can't be!)
   # we have to read in the query results ourselves, as they do not have standard layout
@@ -236,7 +246,7 @@ groupstats - create reports on newsgroup usage
 
 =head1 SYNOPSIS
 
-B<groupstats> [B<-Vhiscqd>] [B<-m> I<YYYY-MM> | B<-p> I<YYYY-MM:YYYY-MM> | B<-a>] [B<-n> I<newsgroup(s)>] [B<-t> I<threshold>] [B<-l> I<level>] [B<-b> I<number>] [B<-o> I<output type>] [B<-g> I<database table>]
+B<groupstats> [B<-Vhiscqd>] [B<-m> I<YYYY-MM> | B<-p> I<YYYY-MM:YYYY-MM> | B<-a>] [B<-n> I<newsgroup(s)>] [B<-t> I<threshold>] [B<-l> I<level>] [B<-b> I<number>] [B<-o> I<output type>] [B<-f> I<filename template>] [B<-g> I<database table>]
 
 =head1 REQUIREMENTS
 
@@ -355,7 +365,7 @@ postings every single month will be included. Output will be ordered
 by newsgroup name, followed by month.
 
 This setting will be ignored if B<-b> is set. Overrides B<-t> and
-can't be used together with B<-q> or B<-d>.
+can't be used together with B<-q>, B<-d> or B<-f>.
 
 =item B<-b> I<n> (best of)
 
@@ -364,8 +374,8 @@ whole reporting period. Can be inverted by the B<-i> switch so that a
 list of the I<n> newsgroups with the least postings over the whole
 period is generated. Output will be ordered by sum of postings.
 
-Overrides B<-t> and B<-l> and can't be used together with B<-q> or
-B<-d>. Output format is set to I<pretty> (see below).
+Overrides B<-t> and B<-l> and can't be used together with B<-q>, B<-d>
+or B<-f>. Output format is set to I<pretty> (see below).
 
 =item B<-i> (invert)
 
@@ -404,7 +414,10 @@ format.
 
 =item B<-c> (captions)
 
-Add captions to output (reporting period, newsgroups list, threshold).
+Add captions to output (reporting period, newsgroups list, threshold
+and so on).
+
+This setting will be ignored if B<-f> is set.
 
 =item B<-q> (quantity of postings)
 
@@ -417,6 +430,20 @@ Cannot be used with B<-l> or B<-b>.
 Change sort order to descending.
 
 Cannot be used with B<-l> or B<-b>.
+
+=item B<-f> I<filename template> (output file)
+
+Save output to file instead of dumping it to STDOUT. B<groupstats>
+will create one file for each month, with filenames composed by
+adding year and month to the I<filename template>, for example
+with B<-f> I<stats>:
+
+    stats-2010-01
+    stats-2010-02
+    ... and so on
+
+This setting will be ignored if B<-l> or B<-b> is set. Output format
+is set to I<dump> (see above).
 
 =item B<-g> I<table> (postings per group table)
 

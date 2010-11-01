@@ -303,14 +303,27 @@ sub ListMonth {
 sub OutputData {
 ################################################################################
 ### read database query results from DBHandle and print results with formatting
-### IN : $Format : format specifier
-###      $DBQuery: database query handle with executed query,
-###                containing $Month, $Key, $Value
+### IN : $Format  : format specifier
+###      $FileName: file name template (-f): filename-YYYY-MM
+###      $DBQuery : database query handle with executed query,
+###                 containing $Month, $Key, $Value
 ###      $PadGroup: padding length for newsgroups field (optional) for 'pretty'
-  my ($Format, $DBQuery,$PadGroup) = @_;
+  my ($Format, $FileName, $DBQuery, $PadGroup) = @_;
+  my ($Handle, $OUT);
+  our $LastIteration;
   while (my ($Month, $Key, $Value) = $DBQuery->fetchrow_array) {
-    print &FormatOutput($Format, $Month, $Key, $Value, $PadGroup);
+    # set output file handle
+    if (!$FileName) {
+      $Handle = *STDOUT{IO}; # set $Handle to a reference to STDOUT
+    } elsif (!defined($LastIteration) or $LastIteration ne $Month) {
+      close $OUT if ($LastIteration);
+      open ($OUT,sprintf('>%s-%s',$FileName,$Month)) or die sprintf("$MySelf: E: Cannot open output file '%s-%s': $!\n",$FileName,$Month);
+      $Handle = $OUT;
+    };
+    print $Handle &FormatOutput($Format, $Month, $Key, $Value, $PadGroup);
+    $LastIteration = $Month;
   };
+  close $OUT if ($FileName);
 };
 
 ################################################################################
