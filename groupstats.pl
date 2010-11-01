@@ -62,8 +62,8 @@ if ($Options{'b'} or $Options{'l'}) {
 };
 
 ### check output type
-# default output type to 'dump'
-$Options{'o'} = 'dump' if !$Options{'o'};
+# default output type to 'pretty'
+$Options{'o'} = 'pretty' if !$Options{'o'};
 # fail if more than one newsgroup is combined with 'dumpgroup' type
 die ("$MySelf: E: You cannot combine newsgroup lists (-n) with more than one group with '-o dumpgroup'!\n") if ($Options{'o'} eq 'dumpgroup' and defined($Options{'n'}) and $Options{'n'} =~ /:|\*/);
 # accept 'dumpgroup' only with -n
@@ -72,9 +72,14 @@ if ($Options{'o'} eq 'dumpgroup' and !defined($Options{'n'})) {
   warn ("$MySelf: W: You must submit exactly one newsgroup ('-n news.group') for '-o dumpgroup'. Output type was set to 'dump'.\n");
 };
 # set output type to 'pretty' for -l
-if ($Options{'l'}) {
+if ($Options{'l'} and $Options{'o'} ne 'pretty') {
   $Options{'o'} = 'pretty';
   warn ("$MySelf: W: Output type forced to '-o pretty' due to usage of '-l'.\n");
+};
+# set output type to 'dump' for -f
+if ($Options{'f'} and $Options{'o'} ne 'dump') {
+  $Options{'o'} = 'dump';
+  warn ("$MySelf: W: Output type forced to '-o dump' due to usage of '-f'.\n");
 };
 
 ### init database
@@ -94,7 +99,7 @@ if ($Options{'a'}) {
 } else {
   ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
 };
-# if time period is more than one month: set output type to '-o pretty' or '-o dumpgroup'
+# if time period is more than one month: force output type to '-o pretty' or '-o dumpgroup'
 if ($Options{'o'} eq 'dump' and ($Options{'p'} or $Options{'a'})) {
   if (defined($Options{'n'}) and $Options{'n'} !~ /:|\*/) {
     # just one newsgroup is defined
@@ -296,10 +301,9 @@ period by using B<-l> (together with B<i> as needed).
 Last but not least you can create a "best of" list of the top x
 newsgroups via B<-b> (or a "worst of" list by adding B<i>).
 
-By default, B<groupstats> will dump a very simple alphabetical list of
-newsgroups, one per line, followed by the number of postings in that
-month. This output format of course cannot sensibly be combined with
-time periods, so you can set the output format by using B<-o> (see
+By default, B<groupstats> will dump an alphabetical list of newsgroups,
+one per line, followed by the number of postings in that group, for
+every month. You can change the output format by using B<-o> (see
 below). Captions can be added by setting the B<-c> switch.
 
 =head2 Configuration
@@ -395,10 +399,18 @@ See the B<gatherstats> man page for details.
 
 =item B<-o> I<output type> (output format)
 
-Set output format. Default is I<dump>, consisting of an alphabetical
-list of newsgroups, each on a new line, followed by the number of
-postings in that month. This default format can't be used with time
-periods of more than one month.
+Set output format. Default is I<pretty>, which will print a header for
+each new month, followed by an alphabetical list of newsgroups, each
+on a new line, followed by the number of postings in that month.
+B<groupstats> will try to align newsgroup names and posting counts.
+Usage of B<-b> will force this format; it cannot be used together with
+B<-f>.
+
+I<dump> format is used to create an easily parsable output consisting
+of an alphabetical list of newsgroups, each on a new line, followed by
+the number of postings in that month, without any alignment. This
+default format can't be used with time periods of more than one month.
+Usage of B<-f> will force this format.
 
 I<list> format is like I<dump>, but will print the month in front of
 the newsgroup name.
@@ -406,11 +418,6 @@ the newsgroup name.
 I<dumpgroup> format can only be use with a group list (see B<-n>) of
 exactly one newsgroup and is like I<dump>, but will output months,
 followed by the number of postings.
-
-If you don't need easily parsable output, you'll mostly use I<pretty>
-format, which will print a header for each new month and try to align
-newsgroup names and posting counts. Usage of B<-b> will force this
-format.
 
 =item B<-c> (captions)
 
