@@ -1,0 +1,80 @@
+                         NewsStats To-Do List
+                         ====================
+
+This is a list of planned bug fixes, improvements and enhancements for
+NewsStats.
+
+Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
+
+* General
+  - Improve Documentation
+    The documentation is rather sparse and could use some improvement.
+  - Add a test suite
+    There is currently no kind of test suite or regression tests. Something like
+    that is badly needed.
+
+* Additional features
+  - Add hierarchy information (GroupInfo - Bugs #19 #20 #21 #22 #23 #24 #25 #26)
+    NewsStats should be able to recognize invalid (i.e. officially not existing)
+    newsgroups and - optionally - drop them from the list of groups. On the
+    other hand, it should recognize existing, but empty groups and add them with
+    a posting count of 0 to its list.
+    NewsStats should be able to do that for any past month.
+    It would be nice to make up a kind of hierarchy database from that with
+    information like description, charter and moderation status. You should be
+    able to get a list of valid groups for any given month (with a bit of slack
+    for late creation and deletion), optionally including the previously
+    mentioned information; and you should be able to get the history of any
+    group.
+  - Add other reports
+    NewsStats should include some other kinds of reports (stats on used clients,
+    on postings hosts/servers, ...)
+
+* Individual improvements
+  + NewsStats.pm
+    - Add error handling when reading config (Bug #13)
+      NewsStats should check if all mandatory options are set. Some syntax or
+      content related checks would be in order.
+      Some other tests - working database connection, valid database and table
+      names - would be nice.
+
+  + install/install.pl
+    - Add / enhance / test error handling
+    - General tests and optimisations
+
+  + feedlog.pl
+    - Add / enhance / test error handling
+    - General tests and optimisations
+
+  + gatherstats.pl
+    - Fix database updates when re-running (Bug #18)
+      Change REPLACE to DELETE with subsequent INSERT INTO (erase wrong data,
+      i.e. non-existent groups)
+    - Enhance TLH checks to allow for more than one TLH
+    - Make gatherstats aware of hierarchy lists (Bug #17)
+      A current (!) list of existing groups (checkgroups or INN active) should
+      be honored, with optional modifications. Non-existing groups should be
+      (logged and) dropped, existing groups with no postings should be set to 0.
+      Hierarchy elements (*.ALL) must be taken into account.
+      Perhaps invalid group names should also be checked (but what characters
+      should be considered "invalid"?)
+      GroupInfo (see above) could be an alternate solution.
+    - Add gathering of other stats (clients, hosts, ...)
+    - better modularisation (code reuse for other reports!)
+    - Add / enhance / test error handling
+    - General tests and optimisations
+
+  + groupstats.pl
+    - output: fix formatting - GetMaxLength does not work for special queries
+      like -l or -b
+    - beautify output (formats / captions)
+    - -a: improve code - it doesn't make that much sense to get first/last
+      month from database just to query that same database with a time period
+      that equals no time period ... this part of the WHERE clause should be
+      dropped instead
+    - change precedence handling of -m/-p/-a: drop -m if -p or -a are present,
+      drop -p if -a is present
+    - save report(s) to a file (Bug #27)
+    - better modularisation (code reuse for other reports!)
+    - Add / enhance / test error handling
+    - General tests and optimisations
