@@ -26,7 +26,7 @@ use DBI;
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('m:p:n:o:t:l:b:iscqdg:');
+my %Options = &ReadOptions('m:p:an:o:t:l:b:iscqdg:');
 
 ### read configuration
 my %Conf = %{ReadConfig('newsstats.conf')};
@@ -71,10 +71,25 @@ if ($Options{'l'}) {
   warn ("$MySelf: W: Output type forced to '-o pretty' due to usage of '-l'.\n");
 };
 
+### init database
+my $DBHandle = InitDB(\%Conf,1);
+
 ### get time period
-my ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
+my ($StartMonth,$EndMonth);
+# if '-a' is set, set start/end month from database
+# FIXME - it doesn't make that much sense to get first/last month from database to query it
+#         with a time period that equals no time period ...
+if ($Options{'a'}) {
+  undef($Options{'m'});
+  undef($Options{'p'});
+  my $DBQuery = $DBHandle->prepare(sprintf("SELECT MIN(month),MAX(month) FROM %s.%s",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
+  $DBQuery->execute or die sprintf("$MySelf: E: Can't get MIN/MAX month from %s.%s: %s\n",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
+  ($StartMonth,$EndMonth) = $DBQuery->fetchrow_array;
+} else {
+  ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
+};
 # if time period is more than one month: set output type to '-o pretty' or '-o dumpgroup'
-if ($Options{'o'} eq 'dump' and $Options{'p'}) {
+if ($Options{'o'} eq 'dump' and ($Options{'p'} or $Options{'a'})) {
   if (defined($Options{'n'}) and $Options{'n'} !~ /:|\*/) {
    warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o dumpgroup'.\n");
    $Options{'o'} = 'dumpgroup';
@@ -83,9 +98,6 @@ if ($Options{'o'} eq 'dump' and $Options{'p'}) {
    $Options{'o'} = 'pretty';
   }
 };
-
-### init database
-my $DBHandle = InitDB(\%Conf,1);
 
 ### create report
 # get list of newsgroups (-n)
@@ -224,7 +236,7 @@ groupstats - create reports on newsgroup usage
 
 =head1 SYNOPSIS
 
-B<groupstats> [B<-Vhiscqd>] [B<-m> I<YYYY-MM>] [B<-p> I<YYYY-MM:YYYY-MM>] [B<-n> I<newsgroup(s)>] [B<-t> I<threshold>] [B<-l> I<level>] [B<-b> I<number>] [B<-o> I<output type>] [B<-g> I<database table>]
+B<groupstats> [B<-Vhiscqd>] [B<-m> I<YYYY-MM> | B<-p> I<YYYY-MM:YYYY-MM> | B<-a>] [B<-n> I<newsgroup(s)>] [B<-t> I<threshold>] [B<-l> I<level>] [B<-b> I<number>] [B<-o> I<output type>] [B<-g> I<database table>]
 
 =head1 REQUIREMENTS
 
@@ -282,7 +294,7 @@ below). Captions can be added by setting the B<-c> switch.
 
 =head2 Configuration
 
-F<groupstats.pl> will read its configuration from F<newsstats.conf>
+B<groupstats> will read its configuration from F<newsstats.conf>
 which should be present in the same directory via Config::Auto.
 
 See doc/INSTALL for an overview of possible configuration options.
@@ -304,12 +316,18 @@ Print this man page and exit.
 =item B<-m> I<YYYY-MM> (month)
 
 Set processing period to a month in YYYY-MM format. Ignored if B<-p>
-is set.
+or B<-a> is set.
 
 =item B<-p> I<YYYY-MM:YYYY-MM> (period)
 
 Set processing period to a time period between two month, each in
-YYYY-MM format, separated by a colon. Overrides B<-m>.
+YYYY-MM format, separated by a colon. Overrides B<-m>. Ignored if
+B<-a> is set.
+
+=item B<-a> (all)
+
+Set no processing period (process whole database). Overrides B<-m>
+and B<-p>.
 
 =item B<-n> I<newsgroup(s)> (newsgroups)
 
