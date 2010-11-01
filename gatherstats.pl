@@ -54,6 +54,27 @@ die "$MySelf: E: Unknown type '-t $Options{'t'}'!\n" if !exists($LegalTypes{$Opt
 ### get time period (-m or -p)
 my ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
 
+### reformat $Conf{'TLH'}
+my $TLH;
+if ($Conf{'TLH'}) {
+  # $Conf{'TLH'} is parsed as an array by Config::Auto;
+  # make a flat list again, separated by :
+  if (ref($TLH) eq 'ARRAY') {
+    $TLH = join(':',@{$Conf{'TLH'}});
+  } else {
+    $TLH  = $Conf{'TLH'};
+  }
+  # strip whitespace
+  $TLH =~ s/\s//g;
+  # check for illegal characters
+  die "$MySelf: E: Config error - illegal characters in TLH definition\n" if ($TLH !~ /^[a-zA-Z0-9:]+$/);
+  if ($TLH =~ /:/) {
+    # reformat $TLH form a:b to (a)|(b)
+    $TLH =~ s/:/)|(/g;
+    $TLH = '(' . $TLH . ')';
+  };
+};
+
 ### read newsgroups list from -l
 my %ValidGroups = %{&ReadGroupList($Options{'l'})} if $Options{'l'};
 
@@ -77,7 +98,7 @@ foreach my $Month (&ListMonth($StartMonth,$EndMonth)) {
     my %Postings;
     while (($_) = $DBQuery->fetchrow_array) {
       # get list oft newsgroups and hierarchies from Newsgroups:
-      my %Newsgroups = ListNewsgroups($_,$Conf{'TLH'},$Options{'l'} ? \%ValidGroups : '');
+      my %Newsgroups = ListNewsgroups($_,$TLH,$Options{'l'} ? \%ValidGroups : '');
       # count each newsgroup and hierarchy once
       foreach (sort keys %Newsgroups) {
         $Postings{$_}++;
