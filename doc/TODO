@@ -47,18 +47,7 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
     - General tests and optimisations
 
   + gatherstats.pl
-    - Fix database updates when re-running (Bug #18)
-      Change REPLACE to DELETE with subsequent INSERT INTO (erase wrong data,
-      i.e. non-existent groups)
-    - Enhance TLH checks to allow for more than one TLH
-    - Make gatherstats aware of hierarchy lists (Bug #17)
-      A current (!) list of existing groups (checkgroups or INN active) should
-      be honored, with optional modifications. Non-existing groups should be
-      (logged and) dropped, existing groups with no postings should be set to 0.
-      Hierarchy elements (*.ALL) must be taken into account.
-      Perhaps invalid group names should also be checked (but what characters
-      should be considered "invalid"?)
-      GroupInfo (see above) could be an alternate solution.
+    - Use hierarchy information (see GroupInfo above)
     - Add gathering of other stats (clients, hosts, ...)
     - better modularisation (code reuse for other reports!)
     - Add / enhance / test error handling
@@ -72,9 +61,6 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
       month from database just to query that same database with a time period
       that equals no time period ... this part of the WHERE clause should be
       dropped instead
-    - change precedence handling of -m/-p/-a: drop -m if -p or -a are present,
-      drop -p if -a is present
-    - save report(s) to a file (Bug #27)
     - better modularisation (code reuse for other reports!)
     - Add / enhance / test error handling
     - General tests and optimisations
