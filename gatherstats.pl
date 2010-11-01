@@ -19,7 +19,7 @@ BEGIN {
 }
 use strict;
 
-use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups);
+use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups ReadGroupList);
 
 use DBI;
 
@@ -33,7 +33,7 @@ my %LegalTypes;
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('dom:p:t:n:r:g:c:s:');
+my %Options = &ReadOptions('dom:p:t:l:n:r:g:c:s:');
 
 ### read configuration
 my %Conf = %{ReadConfig('newsstats.conf')};
@@ -54,6 +54,9 @@ die "$MySelf: E: Unknown type '-t $Options{'t'}'!\n" if !exists($LegalTypes{$Opt
 ### get time period (-m or -p)
 my ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
 
+### read newsgroups list from -l
+my %ValidGroups = %{&ReadGroupList($Options{'l'})} if $Options{'l'};
+
 ### init database
 my $DBHandle = InitDB(\%Conf,1);
 
@@ -72,15 +75,22 @@ foreach my $Month (&ListMonth($StartMonth,$EndMonth)) {
 
     # count postings per group
     my %Postings;
-
     while (($_) = $DBQuery->fetchrow_array) {
       # get list oft newsgroups and hierarchies from Newsgroups:
-      my %Newsgroups = ListNewsgroups($_);
+      my %Newsgroups = ListNewsgroups($_,$Options{'l'} ? \%ValidGroups : '');
       # count each newsgroup and hierarchy once
       foreach (sort keys %Newsgroups) {
-        # don't count newsgroup/hierarchy in wrong TLH
-        next if(defined($Conf{'TLH'}) and !/^$Conf{'TLH'}/);
         $Postings{$_}++;
+      };
+    };
+
+    # add valid but empty groups if -l is set
+    if (%ValidGroups) {
+      foreach (sort keys %ValidGroups) {
+        if (!defined($Postings{$_})) {
+          $Postings{$_} = 0 ;
+          warn (sprintf("ADDED: %s as empty group\n",$_));
+        }
       };
     };
 
@@ -112,7 +122,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdo>] [B<-m> I<YYYY-MM>] [B<-p> I<YYYY-MM:YYYY-MM>] [B<-t> I<type>] [B<-n> I<TLH>] [B<-r> I<database table>] [B<-g> I<database table>] [B<-c> I<database table>] [B<-s> I<database table>]
+B<gatherstats> [B<-Vhdo>] [B<-m> I<YYYY-MM>] [B<-p> I<YYYY-MM:YYYY-MM>] [B<-t> I<type>] [B<-l> I<filename>] [B<-n> I<TLH>] [B<-r> I<database table>] [B<-g> I<database table>] [B<-c> I<database table>] [B<-s> I<database table>]
 
 =head1 REQUIREMENTS
 
@@ -219,6 +229,17 @@ Set processing type to one of I<all> and I<groups>. Defaults to all
 (and is currently rather pointless as only I<groups> has been
 implemented).
 
+=item B<-l> I<filename> (check against list)
+
+Check each group against a list of valid newsgroups read from
+I<filename>, one group on each line and ignoring everything after the
+first whitespace (so you can use a file in checkgroups format or (part
+of) your INN active file).
+
+Newsgroups not found in I<filename> will be dropped (and logged to
+STDERR), and newsgroups found in I<filename> but having no postings
+will be added with a count of 0 (and logged to STDERR).
+
 =item B<-n> I<TLH> (newsgroup hierarchy)
 
 Override I<TLH> from F<newsstats.conf>.
@@ -259,9 +280,10 @@ Process all types of information for January of 2010:
 
     gatherstats -m 2010-01
 
-Process only number of postings for the year of 2010:
+Process only number of postings for the year of 2010,
+checking against checkgroups-2010.txt:
 
-    gatherstats -p 2010-01:2010-12 -t groups
+    gatherstats -p 2010-01:2010-12 -t groups -l checkgroups-2010.txt
 
 =head1 FILES
 

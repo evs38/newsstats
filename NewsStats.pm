@@ -31,6 +31,7 @@ require Exporter;
   SplitPeriod
   ListMonth
   ListNewsgroups
+  ReadGroupList
   OutputData
   FormatOutput
   SQLHierarchies
@@ -154,15 +155,23 @@ sub ListNewsgroups {
 ### explode a (scalar) list of newsgroup names to a list of newsgroup and
 ### hierarchy names where every newsgroup and hierarchy appears only once:
 ### de.alt.test,de.alt.admin -> de.ALL, de.alt.ALL, de.alt.test, de.alt.admin
-### IN : $Newsgroups: a list of newsgroups (content of Newsgroups: header)
-### OUT: %Newsgroups: hash containing all newsgroup and hierarchy names as keys
-  my ($Newsgroups) = @_;
+### IN : $Newsgroups  : a list of newsgroups (content of Newsgroups: header)
+###      $ValidGroupsR: reference to a hash containing all valid newsgroups
+###                     as keys
+### OUT: %Newsgroups  : hash containing all newsgroup and hierarchy names as keys
+  my ($Newsgroups,$ValidGroupsR) = @_;
+  my %ValidGroups = %{$ValidGroupsR} if $ValidGroupsR;
   my %Newsgroups;
   chomp($Newsgroups);
   # remove whitespace from contents of Newsgroups:
   $Newsgroups =~ s/\s//;
   # call &HierarchyCount for each newsgroup in $Newsgroups:
   for (split /,/, $Newsgroups) {
+    # don't count invalid newsgroups
+    if(%ValidGroups and !defined($ValidGroups{$_})) {
+      warn (sprintf("DROPPED: %s\n",$_));
+      next;
+    }
     # add original newsgroup to %Newsgroups
     $Newsgroups{$_} = 1;
     # add all hierarchy elements to %Newsgroups, amended by '.ALL',
@@ -192,6 +201,26 @@ sub ParseHierarchies {
     push @Hierarchies, $Newsgroup;
   };
   return @Hierarchies;
+};
+
+################################################################################
+sub ReadGroupList {
+################################################################################
+### read a list of valid newsgroups from file (each group on one line,
+### ignoring everything after the first whitespace and so accepting files
+### in checkgroups format as well as (parts of) an INN active file)
+### IN : $Filename    : file to read
+### OUT: \%ValidGroups: hash containing all valid newsgroups
+  my ($Filename) = @_;
+  my %ValidGroups;
+  open (my $LIST,"<$Filename") or die "$MySelf: E: Cannot read $Filename: $!\n";
+  while (<$LIST>) {
+    s/^(\S+).*$/$1/;
+    chomp;
+    $ValidGroups{$_} = '1';
+  };
+  close $LIST;
+  return \%ValidGroups;
 };
 
 ################################################################################
