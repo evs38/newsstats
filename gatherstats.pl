@@ -94,12 +94,19 @@ foreach my $Month (&ListMonth($StartMonth,$EndMonth)) {
       };
     };
 
+    # delete old data for that month
+    if (!$Options{'o'}) {
+      $DBQuery = $DBHandle->do(sprintf("DELETE FROM %s.%s WHERE month = ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}),undef,$Month)
+        or warn sprintf("$MySelf: E: Can't delete old groups data for %s from %s.%s: $DBI::errstr\n",$Month,$Conf{'DBDatabase'},$Conf{'DBTableGrps'});
+    };
+
     print "----- GroupStats -----\n" if $Options{'d'};
     foreach my $Newsgroup (sort keys %Postings) {
       print "$Newsgroup => $Postings{$Newsgroup}\n" if $Options{'d'};
       if (!$Options{'o'}) {
         # write to database
-        $DBQuery = $DBHandle->prepare(sprintf("REPLACE INTO %s.%s (month,newsgroup,postings) VALUES (?, ?, ?)",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
+        $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s (month,newsgroup,postings) VALUES (?, ?, ?)",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
+        # $DBQuery = $DBHandle->prepare(sprintf("REPLACE INTO %s.%s (month,newsgroup,postings) VALUES (?, ?, ?)",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
         $DBQuery->execute($Month, $Newsgroup, $Postings{$Newsgroup}) or die sprintf("$MySelf: E: Can't write groups data for %s/%s to %s.%s: $DBI::errstr\n",$Month,$Newsgroup,$Conf{'DBDatabase'},$Conf{'DBTableGrps'});
         $DBQuery->finish;
       };
