@@ -47,6 +47,10 @@ my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
 ##### Database table definitions
 ##### --------------------------------------------------------------------------
 
+my $DBCreate = <<SQLDB;
+CREATE DATABASE IF NOT EXISTS `$Conf{'DBDatabase'}` DEFAULT CHARSET=utf8;
+SQLDB
+
 my %DBCreate = ('DBTableRaw'  => <<RAW, 'DBTableGrps' => <<GRPS);
 -- 
 -- Table structure for table DBTableRaw
@@ -150,6 +154,23 @@ UPGRADE
 
 ##### --------------------------- End of definitions ---------------------------
 
+### create DB, if necessary
+if (!$OptUpdate) {
+  print "----------\nStarting database creation.\n";
+  # create database
+  # we can't use InitDB() as that will use a table name of
+  # the table that doesn't exist yet ...
+  my $DBHandle = DBI->connect(sprintf('DBI:%s:host=%s',$Conf{'DBDriver'},
+                                      $Conf{'DBHost'}), $Conf{'DBUser'},
+                                      $Conf{'DBPw'}, { PrintError => 0 });
+  my $DBQuery = $DBHandle->prepare($DBCreate);
+  $DBQuery->execute() or &Bleat(2, sprintf("Can't create database %s: %s%\n",
+                                           $Conf{'DBDatabase'}, $DBI::errstr));
+  
+  printf("Database table %s created succesfully.\n",$Conf{'DBDatabase'});
+  $DBHandle->disconnect;
+};
+
 ### DB init, read list of tables
 print "Reading database information.\n";
 my $DBHandle = InitDB(\%Conf,1);
@@ -158,7 +179,6 @@ my %TablesInDB =
 
 if (!$OptUpdate) {
   ##### installation mode
-  print "----------\nStarting database table generation.\n";
   # check for tables and create them, if they don't exist yet
   foreach my $Table (keys %DBCreate) {
     &CreateTable($Table);
