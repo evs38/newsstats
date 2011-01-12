@@ -134,7 +134,9 @@ Enjoy!
 -thh <thh\@inter.net>
 INSTALL
 
-my $Upgrade = <<UPGRADE;
+my $Upgrade ='';
+if ($OptUpdate) {
+ $Upgrade = <<UPGRADE;
 ----------
 Your installation was upgraded from $OptUpdate to $PackageVersion.
 
@@ -144,6 +146,7 @@ Don't forget to restart your INN feed so that it can pick up the new version:
 
 (or whatever you called your feed).
 UPGRADE
+}
 
 ##### --------------------------- End of definitions ---------------------------
 
