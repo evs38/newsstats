@@ -7,7 +7,7 @@
 # 
 # It is part of the NewsStats package.
 #
-# Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+# Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 #
 # It can be redistributed and/or modified under the same terms under 
 # which Perl itself is published.
@@ -19,226 +19,229 @@ BEGIN {
 }
 use strict;
 
-use NewsStats qw(:DEFAULT :TimePeriods :Output :SQLHelper);
+use NewsStats qw(:DEFAULT :TimePeriods :Output :SQLHelper ReadGroupList);
 
 use DBI;
+use Getopt::Long qw(GetOptions);
+Getopt::Long::config ('bundling');
 
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('m:p:an:o:t:l:b:iscqdf:g:');
+my ($OptBoundType,$OptCaptions,$OptCheckgroupsFile,$OptComments,
+    $OptFileTemplate,$OptFormat,$OptGroupBy,$OptGroupsDB,$LowBound,$OptMonth,
+    $OptNewsgroups,$OptOrderBy,$OptReportType,$OptSums,$UppBound);
+GetOptions ('b|boundary=s'   => \$OptBoundType,
+            'c|captions!'    => \$OptCaptions,
+            'checkgroups=s'  => \$OptCheckgroupsFile,
+            'comments!'      => \$OptComments,
+            'filetemplate=s' => \$OptFileTemplate,
+            'f|format=s'     => \$OptFormat,
+            'g|group-by=s'   => \$OptGroupBy,
+            'groupsdb=s'     => \$OptGroupsDB,
+            'l|lower=i'      => \$LowBound,
+            'm|month=s'      => \$OptMonth,
+            'n|newsgroups=s' => \$OptNewsgroups,
+            'o|order-by=s'   => \$OptOrderBy,
+            'r|report=s'     => \$OptReportType,
+            's|sums!'        => \$OptSums,
+            'u|upper=i'      => \$UppBound,
+            'h|help'         => \&ShowPOD,
+            'V|version'      => \&ShowVersion) or exit 1;
+# parse parameters
+# $OptComments defaults to TRUE
+$OptComments = 1 if (!defined($OptComments));
+# force --nocomments when --filetemplate is used
+$OptComments = 0 if ($OptFileTemplate);
+# parse $OptBoundType
+if ($OptBoundType) {
+  if ($OptBoundType =~ /level/i) {
+    $OptBoundType = 'level';
+  } elsif ($OptBoundType =~ /av(era)?ge?/i) {
+    $OptBoundType = 'average';
+  } elsif ($OptBoundType =~ /sums?/i) {
+    $OptBoundType = 'sum';
+  } else {
+    $OptBoundType = 'default';
+  }
+}
+# parse $OptReportType
+if ($OptReportType) {
+  if ($OptReportType =~ /av(era)?ge?/i) {
+    $OptReportType = 'average';
+  } elsif ($OptReportType =~ /sums?/i) {
+    $OptReportType = 'sum';
+  } else {
+    $OptReportType  = 'default';
+  }
+}
+# read list of newsgroups from --checkgroups
+# into a hash reference
+my $ValidGroups = &ReadGroupList($OptCheckgroupsFile) if $OptCheckgroupsFile;
 
 ### read configuration
-my %Conf = %{ReadConfig('newsstats.conf')};
+my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
 
 ### override configuration via commandline options
 my %ConfOverride;
-$ConfOverride{'DBTableGrps'}  = $Options{'g'} if $Options{'g'};
+$ConfOverride{'DBTableGrps'} = $OptGroupsDB if $OptGroupsDB;
 &OverrideConfig(\%Conf,\%ConfOverride);
-
-### check for incompatible command line options
-# you can't mix '-t', '-b' and '-l'
-# -b/-l take preference over -t, and -b takes preference over -l
-# you can't use '-f' with '-b' or '-l'
-if ($Options{'b'} or $Options{'l'}) {
-  if ($Options{'f'}) {
-    # drop -f
-    warn ("$MySelf: W: You cannot save the report to monthly files when using top lists (-b) or levels (-l). Filename template '-f $Options{'f'}' was ignored.\n");
-    undef($Options{'f'});
-  };
-  if ($Options{'t'}) {
-    # drop -t
-    warn ("$MySelf: W: You cannot combine thresholds (-t) and top lists (-b) or levels (-l). Threshold '-t $Options{'t'}' was ignored.\n");
-    undef($Options{'t'});
-  };
-  if ($Options{'b'} and $Options{'l'}) {
-    # drop -l
-    warn ("$MySelf: W: You cannot combine top lists (-b) and levels (-l). Level '-l $Options{'l'}' was ignored.\n");
-    undef($Options{'l'});
-  };
-  # -q/-d don't work with -b or -l
-  warn ("$MySelf: W: Sorting by number of postings (-q) ignored due to top list mode (-b) / levels (-l).\n") if $Options{'q'};
-  warn ("$MySelf: W: Reverse sorting (-d) ignored due to top list mode (-b) / levels (-l).\n") if $Options{'d'};
-};
-
-### check output type
-# default output type to 'pretty'
-$Options{'o'} = 'pretty' if !$Options{'o'};
-# fail if more than one newsgroup is combined with 'dumpgroup' type
-die ("$MySelf: E: You cannot combine newsgroup lists (-n) with more than one group with '-o dumpgroup'!\n") if ($Options{'o'} eq 'dumpgroup' and defined($Options{'n'}) and $Options{'n'} =~ /:|\*/);
-# accept 'dumpgroup' only with -n
-if ($Options{'o'} eq 'dumpgroup' and !defined($Options{'n'})) {
-  $Options{'o'} = 'dump';
-  warn ("$MySelf: W: You must submit exactly one newsgroup ('-n news.group') for '-o dumpgroup'. Output type was set to 'dump'.\n");
-};
-# set output type to 'pretty' for -l
-if ($Options{'l'} and $Options{'o'} ne 'pretty') {
-  $Options{'o'} = 'pretty';
-  warn ("$MySelf: W: Output type forced to '-o pretty' due to usage of '-l'.\n");
-};
-# set output type to 'dump' for -f
-if ($Options{'f'} and $Options{'o'} ne 'dump') {
-  $Options{'o'} = 'dump';
-  warn ("$MySelf: W: Output type forced to '-o dump' due to usage of '-f'.\n");
-};
 
 ### init database
 my $DBHandle = InitDB(\%Conf,1);
 
-### get time period
-my ($StartMonth,$EndMonth);
-# if '-a' is set, set start/end month from database
-# FIXME - it doesn't make that much sense to get first/last month from database to query it
-#         with a time period that equals no time period ...
-if ($Options{'a'}) {
-  undef($Options{'m'});
-  undef($Options{'p'});
-  my $DBQuery = $DBHandle->prepare(sprintf("SELECT MIN(month),MAX(month) FROM %s.%s",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
-  $DBQuery->execute or die sprintf("$MySelf: E: Can't get MIN/MAX month from %s.%s: %s\n",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
-  ($StartMonth,$EndMonth) = $DBQuery->fetchrow_array;
-} else {
-  ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
-};
-# if -p or -a are set: drop -m
-undef $Options{'m'} if ($Options{'p'} or $Options{'a'});
-# if time period is more than one month: force output type to '-o pretty' or '-o dumpgroup'
-if ($Options{'o'} eq 'dump' and ($Options{'p'} or $Options{'a'})) {
-  if (defined($Options{'n'}) and $Options{'n'} !~ /:|\*/) {
-    # just one newsgroup is defined
-    warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o dumpgroup'.\n");
-    $Options{'o'} = 'dumpgroup';
-  } elsif (!defined($Options{'f'})) {
-    # more than one newsgroup - and no file output
-    warn ("$MySelf: W: You cannot combine time periods (-p) with '-o dump', changing output type to '-o pretty'.\n");
-    $Options{'o'} = 'pretty';
-  }
-};
+### get time period and newsgroups, prepare SQL 'WHERE' clause
+# get time period
+# and set caption for output and expression for SQL 'WHERE' clause
+my ($CaptionPeriod,$SQLWherePeriod) = &GetTimePeriod($OptMonth);
+# bail out if --month is invalid
+&Bleat(2,"--month option has an invalid format - ".
+         "please use 'YYYY-MM', 'YYYY-MM:YYYY-MM' or 'ALL'!") if !$CaptionPeriod;
+# get list of newsgroups and set expression for SQL 'WHERE' clause
+# with placeholders as well as a list of newsgroup to bind to them
+my ($SQLWhereNewsgroups,@SQLBindNewsgroups) = &SQLGroupList($OptNewsgroups)
+  if $OptNewsgroups;;
 
-### create report
-# get list of newsgroups (-n)
-my ($QueryGroupList,$QueryThreshold,@GroupList,@Params);
-my $Newsgroups = $Options{'n'};
-if ($Newsgroups) {
-  # explode list of newsgroups for WHERE clause
-  ($QueryGroupList,@GroupList) = &SQLGroupList($Newsgroups);
+### build SQL WHERE clause (and HAVING clause, if needed)
+my ($SQLWhereClause,$SQLHavingClause);
+# $OptBoundType 'level'
+if ($OptBoundType and $OptBoundType ne 'default') {
+  $SQLWhereClause = SQLBuildClause('where',$SQLWherePeriod,
+                                   $SQLWhereNewsgroups,&SQLHierarchies($OptSums));
+  $SQLHavingClause = SQLBuildClause('having',&SQLSetBounds($OptBoundType,
+                                                           $LowBound,$UppBound));
+# $OptBoundType 'threshold' / 'default' or none
 } else {
-  # set to dummy value (always true)
-  $QueryGroupList = 1;
-};
-
-# manage thresholds
-if (defined($Options{'t'})) {
-  if ($Options{'i'}) {
-    # -i: list groups below threshold
-    $QueryThreshold .= ' postings < ?';
-  } else {
-    # default: list groups above threshold
-    $QueryThreshold .= ' postings > ?';
-  };
-  # push threshold to Params
-  push @Params,$Options{'t'};
-} else {
-  # set to dummy value (always true)
-  $QueryThreshold = 1;  
+  $SQLWhereClause = SQLBuildClause('where',$SQLWherePeriod,
+                                   $SQLWhereNewsgroups,&SQLHierarchies($OptSums),
+                                   &SQLSetBounds('default',$LowBound,$UppBound));
 }
 
-# construct WHERE clause
-# $QueryGroupList is "list of newsgroup" (or 1),
-# $QueryThreshold is threshold definition (or 1),
-# &SQLHierarchies() takes care of the exclusion of hierarchy levels (.ALL)
-# according to setting of -s
-my $WhereClause = sprintf('month BETWEEN ? AND ? AND %s AND %s %s',$QueryGroupList,$QueryThreshold,&SQLHierarchies($Options{'s'}));
+### get sort order and build SQL 'ORDER BY' clause
+# default to 'newsgroup' for $OptBoundType 'level' or 'average'
+$OptGroupBy = 'newsgroup' if (!$OptGroupBy and
+                              $OptBoundType and $OptBoundType ne 'default');
+# force to 'month' for $OptReportType 'average' or 'sum'
+$OptGroupBy = 'month' if ($OptReportType and $OptReportType ne 'default');
+# parse $OptGroupBy to $GroupBy, create ORDER BY clause $SQLOrderClause
+my ($GroupBy,$SQLOrderClause) = SQLSortOrder($OptGroupBy, $OptOrderBy);
+# $GroupBy will contain 'month' or 'newsgroup' (parsed result of $OptGroupBy)
+# set it to 'month' or 'key' for OutputData()
+$GroupBy = ($GroupBy eq 'month') ? 'month' : 'key';
 
-# get length of longest newsgroup delivered by query for formatting purposes
-# FIXME
-my $MaxLength = &GetMaxLength($DBHandle,$Conf{'DBTableGrps'},'newsgroup',$WhereClause,$StartMonth,$EndMonth,(@GroupList,@Params));
+### get report type and build SQL 'SELECT' query
+my $SQLSelect;
+my $SQLGroupClause = '';
+my $Precision = 0;       # number of digits right of decimal point for output
+if ($OptReportType and $OptReportType ne 'default') {
+  $SQLGroupClause = 'GROUP BY newsgroup';
+  # change $SQLOrderClause: replace everything before 'postings'
+  $SQLOrderClause =~ s/BY.+postings/BY postings/;
+  if ($OptReportType eq 'average') {
+    $SQLSelect = "'All months',newsgroup,AVG(postings)";
+    $Precision = 2;
+    # change $SQLOrderClause: replace 'postings' with 'AVG(postings)'
+    $SQLOrderClause =~ s/postings/AVG(postings)/;
+  } elsif ($OptReportType eq 'sum') {
+    $SQLSelect = "'All months',newsgroup,SUM(postings)";
+    # change $SQLOrderClause: replace 'postings' with 'SUM(postings)'
+    $SQLOrderClause =~ s/postings/SUM(postings)/;
+  }
+ } else {
+  $SQLSelect = 'month,newsgroup,postings';
+};
 
-my ($OrderClause,$DBQuery);
-# -b (best of / top list) defined?
-if (!defined($Options{'b'}) and !defined($Options{'l'})) {
-  # default: neither -b nor -l
-  # set ordering (ORDER BY) to "newsgroups" or "postings", "ASC" or "DESC"
-  # according to -q and -d
-  $OrderClause = 'newsgroup';
-  $OrderClause = 'postings' if $Options{'q'};
-  $OrderClause .= ' DESC' if $Options{'d'};
-  # prepare query: get number of postings per group from groups table for given months and newsgroups
-  $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE %s ORDER BY month,%s",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$OrderClause));
-} elsif ($Options{'b'}) {
-  # -b is set (then -l can't be!)
-  # set sorting order (-i): top or flop list?
-  if ($Options{'i'}) {
-    $OrderClause = 'postings';
-  } else {
-    $OrderClause = 'postings DESC';
-  };
-  # set -b to 10 if < 1 (Top 10)
-  $Options{'b'} = 10 if $Options{'b'} !~ /^\d*$/ or $Options{'b'} < 1;
-  # push LIMIT to Params
-  push @Params,$Options{'b'};
-  # prepare query: get sum of postings per group from groups table for given months and newsgroups with LIMIT
-  $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroup,SUM(postings) AS postings FROM %s.%s WHERE %s GROUP BY newsgroup ORDER BY %s,newsgroup LIMIT ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$OrderClause));
-} else {
-  # -l must be set now, as all other cases have been taken care of
-  # which kind of level (-i): more than -l x or less than -l x?
-  my ($Level);
-  if ($Options{'i'}) {
-    $Level = '<';
-  } else {
-    $Level = '>';
-  };
-  # prepare and execute query: get list of newsgroups meeting level condition
-  $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroup FROM %s.%s WHERE %s GROUP BY newsgroup HAVING MAX(postings) %s ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$WhereClause,$Level));
-  $DBQuery->execute($StartMonth,$EndMonth,@GroupList,$Options{'l'})
-    or die sprintf("$MySelf: E: Can't get groups data for %s to %s from %s.%s: %s\n",$StartMonth,$EndMonth,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
+### get length of longest newsgroup name delivered by query
+### for formatting purposes
+my $Field = ($GroupBy eq 'month') ? 'newsgroup' : 'month';
+my $MaxLength = &GetMaxLength($DBHandle,$Conf{'DBTableGrps'},
+                              $Field,$SQLWhereClause,$SQLHavingClause,
+                              @SQLBindNewsgroups);
+
+### build and execute SQL query
+my ($DBQuery);
+# special query preparation for $OptBoundType 'level', 'average' or 'sums'
+if ($OptBoundType and $OptBoundType ne 'default') {
+  # prepare and execute first query:
+  # get list of newsgroups meeting level conditions
+  $DBQuery = $DBHandle->prepare(sprintf('SELECT newsgroup FROM %s.%s %s '.
+                                        'GROUP BY newsgroup %s',
+                                        $Conf{'DBDatabase'},$Conf{'DBTableGrps'},
+                                        $SQLWhereClause,$SQLHavingClause));
+  $DBQuery->execute(@SQLBindNewsgroups)
+    or &Bleat(2,sprintf("Can't get groups data for %s from %s.%s: %s\n",
+                        $CaptionPeriod,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},
+                        $DBI::errstr));
   # add newsgroups to a comma-seperated list ready for IN(...) query
   my $GroupList;
   while (my ($Newsgroup) = $DBQuery->fetchrow_array) {
-    $GroupList .= ',' if (defined($GroupList) and $GroupList ne '');
+    $GroupList .= ',' if $GroupList;
     $GroupList .= "'$Newsgroup'";
   };
-  $DBQuery = $DBHandle->prepare(sprintf("SELECT month,newsgroup,postings FROM %s.%s WHERE newsgroup IN (%s) AND %s ORDER BY newsgroup,month",$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$GroupList,$WhereClause));
-};
+  # enhance $WhereClause
+  if ($GroupList) {
+    $SQLWhereClause = SQLBuildClause('where',$SQLWhereClause,
+                                     sprintf('newsgroup IN (%s)',$GroupList));
+  } else {
+    # condition cannot be satisfied;
+    # force query to fail by adding '0=1'
+    $SQLWhereClause = SQLBuildClause('where',$SQLWhereClause,'0=1');
+  }
+}
+
+# prepare query
+$DBQuery = $DBHandle->prepare(sprintf('SELECT %s FROM %s.%s %s %s %s',
+                                      $SQLSelect,
+                                      $Conf{'DBDatabase'},$Conf{'DBTableGrps'},
+                                      $SQLWhereClause,$SQLGroupClause,$
+                                      SQLOrderClause));
 
 # execute query
-$DBQuery->execute($StartMonth,$EndMonth,@GroupList,@Params)
-  or die sprintf("$MySelf: E: Can't get groups data for %s to %s from %s.%s: %s\n",$StartMonth,$EndMonth,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},$DBI::errstr);
+$DBQuery->execute(@SQLBindNewsgroups)
+  or &Bleat(2,sprintf("Can't get groups data for %s from %s.%s: %s\n",
+                      $CaptionPeriod,$Conf{'DBDatabase'},$Conf{'DBTableGrps'},
+                      $DBI::errstr));
 
-# output results
-# reset caption (-c) if -f is set
-undef($Options{'c'}) if $Options{'f'};
-# print caption (-c) with time period if -m or -p is set
-if ($Options{'c'}) {
-  if ($Options{'m'}) {
-    printf ("----- Report for %s\n",$StartMonth);
-  } else {
-    printf ("----- Report from %s to %s %s\n",$StartMonth,$EndMonth,$Options{'a'} ? '(all months)' : '');
-  };
-};
-# print caption (-c) with newsgroup list if -n is set
-printf ("----- Newsgroups: %s\n",join(',',split(/:/,$Newsgroups))) if $Options{'c'} and $Options{'n'};
-# print caption (-c) with threshold if -t is set, taking -i in account
-printf ("----- Threshold: %s %u\n",$Options{'i'} ? '<' : '>',$Options{'t'}) if $Options{'c'} and $Options{'t'};
-if (!defined($Options{'b'})  and !defined($Options{'l'})) {
-  # default: neither -b nor -l
-  &OutputData($Options{'o'},$Options{'f'},$DBQuery,$MaxLength);
-} elsif ($Options{'b'}) {
-  # -b is set (then -l can't be!)
-  # we have to read in the query results ourselves, as they do not have standard layout
-  while (my ($Newsgroup,$Postings) = $DBQuery->fetchrow_array) {
-    # we just assign "top x" or "bottom x" instead of a month for the caption and force an output type of pretty
-    print &FormatOutput('pretty', ($Options{'i'} ? 'Bottom ' : 'Top ').$Options{'b'}, $Newsgroup, $Postings, $MaxLength);
-  };
-} else {
-  # -l must be set now, as all other cases have been taken care of
-  # print caption (-c) with level, taking -i in account
-  printf ("----- Newsgroups with %s than %u postings over the whole time period\n",$Options{'i'} ? 'less' : 'more',$Options{'l'}) if $Options{'c'};
-  # we have to read in the query results ourselves, as they do not have standard layout
-  while (my ($Month,$Newsgroup,$Postings) = $DBQuery->fetchrow_array) {
-    # we just switch $Newsgroups and $Month for output generation
-    print &FormatOutput($Options{'o'}, $Newsgroup, $Month, $Postings, 7);
-  };
-};
+### output results
+# set default to 'pretty'
+$OptFormat = 'pretty' if !$OptFormat;
+# print captions if --caption is set
+if ($OptCaptions && $OptComments) {
+  # print time period with report type
+  my $CaptionReportType= '(number of postings for each month)';
+  if ($OptReportType and $OptReportType ne 'default') {
+    $CaptionReportType= '(average number of postings for each month)'
+      if $OptReportType eq 'average';
+    $CaptionReportType= '(number of all postings for that time period)'
+      if $OptReportType eq 'sum';
+  }
+  printf("# ----- Report for %s %s\n",$CaptionPeriod,$CaptionReportType);
+  # print newsgroup list if --newsgroups is set
+  printf("# ----- Newsgroups: %s\n",join(',',split(/:/,$OptNewsgroups)))
+    if $OptNewsgroups;
+  # print boundaries, if set
+  my $CaptionBoundary= '(counting only month fulfilling this condition)';
+  if ($OptBoundType and $OptBoundType ne 'default') {
+    $CaptionBoundary= '(every single month)'  if $OptBoundType eq 'level';
+    $CaptionBoundary= '(on average)'          if $OptBoundType eq 'average';
+    $CaptionBoundary= '(all month summed up)' if $OptBoundType eq 'sum';
+  }
+  printf("# ----- Threshold: %s %s x %s %s %s\n",
+         $LowBound ? $LowBound : '',$LowBound ? '=>' : '',
+         $UppBound ? '<=' : '',$UppBound ? $UppBound : '',$CaptionBoundary)
+    if ($LowBound or $UppBound);
+  # print primary and secondary sort order
+  printf("# ----- Grouped by %s (%s), sorted %s%s\n",
+         ($GroupBy eq 'month') ? 'Months' : 'Newsgroups',
+         ($OptGroupBy and $OptGroupBy =~ /-?desc$/i) ? 'descending' : 'ascending',
+         ($OptOrderBy and $OptOrderBy =~ /posting/i) ? 'by number of postings ' : '',
+         ($OptOrderBy and $OptOrderBy =~ /-?desc$/i) ? 'descending' : 'ascending');
+}
+ 
+# output data
+&OutputData($OptFormat,$OptComments,$GroupBy,$Precision,
+            $OptCheckgroupsFile ? $ValidGroups : '',
+            $OptFileTemplate,$DBQuery,$MaxLength);
 
 ### close handles
 $DBHandle->disconnect;
@@ -253,60 +256,67 @@ groupstats - create reports on newsgroup usage
 
 =head1 SYNOPSIS
 
-B<groupstats> [B<-Vhiscqd>] [B<-m> I<YYYY-MM> | B<-p> I<YYYY-MM:YYYY-MM> | B<-a>] [B<-n> I<newsgroup(s)>] [B<-t> I<threshold>] [B<-l> I<level>] [B<-b> I<number>] [B<-o> I<output type>] [B<-f> I<filename template>] [B<-g> I<database table>]
+B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>]
 
 =head1 REQUIREMENTS
 
-See doc/README: Perl 5.8.x itself and the following modules from CPAN:
-
-=over 2
-
-=item -
-
-Config::Auto
-
-=item -
-
-DBI
-
-=back
+See L<doc/README>.
 
 =head1 DESCRIPTION
 
 This script create reports on newsgroup usage (number of postings per
 group per month) taken from result tables created by
-F<gatherstats.pl>.
+B<gatherstats.pl>.
 
-The time period to act on defaults to last month; you can assign
-another month via the B<-m> switch or a time period via the B<-p>
-switch; the latter takes preference.
+=head2 Features and options
+
+=head3 Time period and newsgroups
+
+The time period to act on defaults to last month; you can assign another
+time period or a single month (or drop all time constraints) via the
+B<--month> option (see below).
 
 B<groupstats> will process all newsgroups by default; you can limit
-that to only some newsgroups by supplying a list of those groups via
-B<-n> (see below). You can include hierarchy levels in the output by
-adding the B<-s> switch (see below).
+processing to only some newsgroups by supplying a list of those groups via
+B<--newsgroups> option (see below). You can include hierarchy levels in
+the output by adding the B<--sums> switch (see below). Optionally
+newsgroups not present in a checkgroups file can be excluded from output,
+sse B<--checkgroups> below.
 
-Furthermore you can set a threshold via B<-t> so that only newsgroups
-with more postings per month will be included in the report. You can
-invert that by the B<-i> switch so only newsgroups with less than
-I<threshold> postings per month will be included.
+=head3 Report type
 
-You can sort the output by number of postings per month instead of the
-default (alphabetical list of newsgroups) by using B<-q>; you can
-reverse the sorting order (from highest to lowest or in reversed
-alphabetical order) by using B<-d>.
+You can choose between different B<--report> types: postings per month,
+average postings per month or all postings summed up; for details, see
+below.
 
-Furthermore, you can create a list of newsgroups that had consistently
-more (or less) than x postings per month during the whole report
-period by using B<-l> (together with B<i> as needed).
+=head3 Upper and lower boundaries
 
-Last but not least you can create a "best of" list of the top x
-newsgroups via B<-b> (or a "worst of" list by adding B<i>).
+Furthermore you can set an upper and/or lower boundary to exclude some
+results from output via the B<--lower> and B<--upper> options,
+respectively. By default, all newsgroups with more and/or less postings
+per month will be excluded from the result set (i.e. not shown and not
+considered for average and sum reports). You can change the meaning of
+those boundaries with the B<--boundary> option. For details, please see
+below.
 
-By default, B<groupstats> will dump an alphabetical list of newsgroups,
-one per line, followed by the number of postings in that group, for
-every month. You can change the output format by using B<-o> (see
-below). Captions can be added by setting the B<-c> switch.
+=head3 Sorting and formatting the output
+
+By default, all results are grouped by month; you can group results by
+newsgroup instead via the B<--groupy-by> option. Within those groups, the
+list of newsgroups (or months) is sorted alphabetically (or
+chronologically, respectively) ascending. You can change that order (and
+sort by number of postings) with the B<--order-by> option. For details and
+exceptions, please see below.
+
+The results will be formatted as a kind of table; you can change the
+output format to a simple list or just a list of newsgroups and number of
+postings with the B<--format> option. Captions will be added by means of
+the B<--caption> option; all comments (and captions) can be supressed by
+using B<--nocomments>.
+
+Last but not least you can redirect all output to a number of files, e.g.
+one for each month, by submitting the B<--filetemplate> option, see below.
+Captions and comments are automatically disabled in this case.
 
 =head2 Configuration
 
@@ -315,37 +325,28 @@ which should be present in the same directory via Config::Auto.
 
 See doc/INSTALL for an overview of possible configuration options.
 
-You can override configuration options via the B<-g> switch.
+You can override some configuration options via the B<--groupsdb> option.
 
 =head1 OPTIONS
 
 =over 3
 
-=item B<-V> (version)
+=item B<-V>, B<--version>
 
-Print out version and copyright information on B<yapfaq> and exit.
+Print out version and copyright information and exit.
 
-=item B<-h> (help)
+=item B<-h>, B<--help>
 
 Print this man page and exit.
 
-=item B<-m> I<YYYY-MM> (month)
+=item B<-m>, B<--month> I<YYYY-MM[:YYYY-MM]|all> 
 
-Set processing period to a month in YYYY-MM format. Ignored if B<-p>
-or B<-a> is set.
+Set processing period to a single month in YYYY-MM format or to a time
+period between two month in YYYY-MM:YYYY-MM format (two month, separated
+by a colon). By using the keyword I<all> instead, you can set no
+processing period to process the whole database.
 
-=item B<-p> I<YYYY-MM:YYYY-MM> (period)
-
-Set processing period to a time period between two month, each in
-YYYY-MM format, separated by a colon. Overrides B<-m>. Ignored if
-B<-a> is set.
-
-=item B<-a> (all)
-
-Set no processing period (process whole database). Overrides B<-m>
-and B<-p>.
-
-=item B<-n> I<newsgroup(s)> (newsgroups)
+=item B<-n>, B<--newsgroups> I<newsgroup(s)>
 
 Limit processing to a certain set of newsgroups. I<newsgroup(s)> can
 be a single newsgroup name (de.alt.test), a newsgroup hierarchy
@@ -354,41 +355,7 @@ example
 
    de.test:de.alt.test:de.newusers.*
 
-=item B<-t> I<threshold> (threshold)
-
-Only include newsgroups with more than I<threshold> postings per
-month. Can be inverted by the B<-i> switch so that only newsgroups
-with less than I<threshold> postings will be included.
-
-This setting will be ignored if B<-l> or B<-b> is set.
-
-=item B<-l> I<level> (level)
-
-Only include newsgroups with more than I<level> postings per
-month, every month during the whole reporting period. Can be inverted
-by the B<-i> switch so that only newsgroups with less than I<level>
-postings every single month will be included. Output will be ordered
-by newsgroup name, followed by month.
-
-This setting will be ignored if B<-b> is set. Overrides B<-t> and
-can't be used together with B<-q>, B<-d> or B<-f>.
-
-=item B<-b> I<n> (best of)
-
-Create a list of the I<n> newsgroups with the most postings over the
-whole reporting period. Can be inverted by the B<-i> switch so that a
-list of the I<n> newsgroups with the least postings over the whole
-period is generated. Output will be ordered by sum of postings.
-
-Overrides B<-t> and B<-l> and can't be used together with B<-q>, B<-d>
-or B<-f>. Output format is set to I<pretty> (see below).
-
-=item B<-i> (invert)
-
-Used in conjunction with B<-t>, B<-l> or B<-b> to set a lower
-threshold or level or generate a "bottom list" instead of a top list.
-
-=item B<-s> (sum per hierarchy level)
+=item B<-s>, B<--sums|--nosums> (sum per hierarchy level)
 
 Include "virtual" groups for every hierarchy level in output, for
 example:
@@ -399,62 +366,219 @@ example:
 
 See the B<gatherstats> man page for details.
 
-=item B<-o> I<output type> (output format)
+=item B<--checkgroups> I<filename>
 
-Set output format. Default is I<pretty>, which will print a header for
-each new month, followed by an alphabetical list of newsgroups, each
-on a new line, followed by the number of postings in that month.
-B<groupstats> will try to align newsgroup names and posting counts.
-Usage of B<-b> will force this format; it cannot be used together with
-B<-f>.
+Restrict output to those newgroups present in a file in checkgroups format
+(one newgroup name per line; everything after the first whitespace on each
+line is ignored). All other newsgroups will be removed from output.
 
-I<dump> format is used to create an easily parsable output consisting
-of an alphabetical list of newsgroups, each on a new line, followed by
-the number of postings in that month, without any alignment. This
-default format can't be used with time periods of more than one month.
-Usage of B<-f> will force this format.
+=item B<-r>, B<--report> I<default|average|sums>
 
-I<list> format is like I<dump>, but will print the month in front of
-the newsgroup name.
+Choose the report type: I<default>, I<average> or I<sums>
 
-I<dumpgroup> format can only be use with a group list (see B<-n>) of
-exactly one newsgroup and is like I<dump>, but will output months,
-followed by the number of postings.
+By default, B<groupstats> will report the number of postings for each
+newsgroup in each month. But it can also report the average number of
+postings per group for all months or the total sum of postings per group
+for all months.
 
-=item B<-c> (captions)
+For report types I<average> and I<sums>, the B<group-by> option has no
+meaning and will be silently ignored (see below).
 
-Add captions to output (reporting period, newsgroups list, threshold
-and so on).
+=item B<-l>, B<--lower> I<lower boundary>
 
-This setting will be ignored if B<-f> is set.
+Set the lower boundary. See B<--boundary> below.
 
-=item B<-q> (quantity of postings)
+=item B<-l>, B<--upper> I<upper boundary>
 
-Sort by number of postings instead of by newsgroup names.
+Set the upper boundary. See B<--boundary> below.
 
-Cannot be used with B<-l> or B<-b>.
+=item B<-b>, B<--boundary> I<boundary type>
 
-=item B<-d> (descending)
+Set the boundary type to one of I<default>, I<level>, I<average> or
+I<sums>.
 
-Change sort order to descending.
+By default, all newsgroups with more postings per month than the upper
+boundary and/or less postings per month than the lower boundary will be
+excluded from further processing. For the default report that means each
+month only newsgroups with a number of postings between the boundaries
+will be displayed. For the other report types, newsgroups with a number of
+postings exceeding the boundaries in all (!) months will not be
+considered.
 
-Cannot be used with B<-l> or B<-b>.
+For example, lets take a list of newsgroups like this:
 
-=item B<-f> I<filename template> (output file)
+    ----- 2012-01:
+    de.comp.datenbanken.misc               6
+    de.comp.datenbanken.ms-access         84
+    de.comp.datenbanken.mysql             88
+    ----- 2012-02:
+    de.comp.datenbanken.misc               8
+    de.comp.datenbanken.ms-access        126
+    de.comp.datenbanken.mysql             21
+    ----- 2012-03:
+    de.comp.datenbanken.misc              24
+    de.comp.datenbanken.ms-access         83
+    de.comp.datenbanken.mysql             36
 
-Save output to file instead of dumping it to STDOUT. B<groupstats>
-will create one file for each month, with filenames composed by
-adding year and month to the I<filename template>, for example
-with B<-f> I<stats>:
+With C<groupstats --month 2012-01:2012-03 --lower 25 --report sums>,
+you'll get the following result:
 
-    stats-2010-01
-    stats-2010-02
+    ----- All months:
+    de.comp.datenbanken.ms-access        293
+    de.comp.datenbanken.mysql            124
+
+de.comp.datenbanken.misc has not been considered even though it has 38
+postings in total, because it has less than 25 postings in every single
+month. If you want to list all newsgroups with more than 25 postings U<in
+total>, you'll have to set the boundary type to I<sum>, see below.
+
+A boundary type of I<level> will show only those newsgroups - at all -
+that satisfy the boundaries in each and every single month. With the above
+list of newsgroups and
+C<groupstats --month 2012-01:2012-03 --lower 25 --boundary level --report sums>,
+you'll get this result:
+
+    ----- All months:
+    de.comp.datenbanken.ms-access        293
+
+de.comp.datenbanken.mysql has not been considered because it had less than
+25 postings in 2012-02.
+
+You can use that to get a list of newsgroups that have more (or less) then
+x postings during the whole reporting period.
+
+A boundary type of I<average> will show only those newsgroups - at all -that
+satisfy the boundaries on average. With the above list of newsgroups and
+C<groupstats --month 2012-01:2012-03 --lower 25 --boundary avg --report sums>,
+you'll get this result:
+
+   ----- All months:
+   de.comp.datenbanken.ms-access        293
+   de.comp.datenbanken.mysql            145
+
+The average number of postings in the three groups is:
+
+    de.comp.datenbanken.misc           12.67
+    de.comp.datenbanken.ms-access      97.67
+    de.comp.datenbanken.mysql          48.33
+
+Last but not least, a boundary type of I<sums> will show only those
+newsgroups - at all - that satisfy the boundaries with the total sum of
+all postings during the reporting period. With the above list of
+newsgroups and
+C<groupstats --month 2012-01:2012-03 --lower 25 --boundary sum --report sums>,
+you'll finally get this result:
+
+    ----- All months:
+    de.comp.datenbanken.misc              38
+    de.comp.datenbanken.ms-access        293
+    de.comp.datenbanken.mysql            145
+
+
+=item B<-g>, B<--group-by> I<month[-desc]|newsgroups[-desc]>
+
+By default, all results are grouped by month, sorted chronologically in
+ascending order, like this:
+
+    ----- 2012-01:
+    de.comp.datenbanken.ms-access         84
+    de.comp.datenbanken.mysql             88
+    ----- 2012-02:
+    de.comp.datenbanken.ms-access        126
+    de.comp.datenbanken.mysql             21
+
+The results can be grouped by newsgroups instead via
+B<--group-by> I<newsgroup>:
+
+    ----- de.comp.datenbanken.ms-access:
+    2012-01         84
+    2012-02        126
+    ----- de.comp.datenbanken.mysql:
+    2012-01         88
+    2012-02         21
+
+By appending I<-desc> to the group-by option parameter, you can reverse
+the sort order - e.g. B<--group-by> I<month-desc> will give:
+
+    ----- 2012-02:
+    de.comp.datenbanken.ms-access        126
+    de.comp.datenbanken.mysql             21
+    ----- 2012-01:
+    de.comp.datenbanken.ms-access         84
+    de.comp.datenbanken.mysql             88
+
+Average and sums reports (see above) will always be grouped by months;
+this option will therefore be ignored.
+
+=item B<-o>, B<--order-by> I<default[-desc]|postings[-desc]>
+
+Within each group (a single month or single newsgroup, see above), the
+report will be sorted by newsgroup names in ascending alphabetical order
+by default. You can change the sort order to descending or sort by number
+of postings instead.
+
+=item B<-f>, B<--format> I<pretty|list|dump>
+
+Select the output format, I<pretty> being the default:
+
+    ----- 2012-01:
+    de.comp.datenbanken.ms-access         84
+    de.comp.datenbanken.mysql             88
+    ----- 2012-02:
+    de.comp.datenbanken.ms-access        126
+    de.comp.datenbanken.mysql             21
+
+I<list> format looks like this:
+
+    2012-01 de.comp.datenbanken.ms-access 84
+    2012-01 de.comp.datenbanken.mysql 88
+    2012-02 de.comp.datenbanken.ms-access 126
+    2012-02 de.comp.datenbanken.mysql 21
+
+And I<dump> format looks like this:
+
+    # 2012-01:
+    de.comp.datenbanken.ms-access 84
+    de.comp.datenbanken.mysql 88
+    # 2012-02:
+    de.comp.datenbanken.ms-access 126
+    de.comp.datenbanken.mysql 21
+
+You can remove the comments by using B<--nocomments>, see below.
+
+=item B<-c>, B<--captions|--nocaptions>
+
+Add captions to output, like this:
+
+    ----- Report for 2012-01 to 2012-02 (number of postings for each month)
+    ----- Newsgroups: de.comp.datenbanken.*
+    ----- Threshold: 10 => x <= 20 (on average)
+    ----- Grouped by Newsgroups (ascending), sorted by number of postings descending
+
+False by default.
+
+=item B<--comments|--nocomments>
+
+Add comments (group headers) to I<dump> and I<pretty> output. True by default.
+
+Use I<--nocomments> to suppress anything except newsgroup names/months and
+numbers of postings. This is enforced when using B<--filetemplate>, see below.
+
+=item B<--filetemplate> I<filename template>
+
+Save output to file(s) instead of dumping it to STDOUT. B<groupstats> will
+create one file for each month (or each newsgroup, accordant to the
+setting of B<--group-by>, see above), with filenames composed by adding
+year and month (or newsgroup names) to the I<filename template>, for
+example with B<--filetemplate> I<stats>:
+
+    stats-2012-01
+    stats-2012-02
     ... and so on
 
-This setting will be ignored if B<-l> or B<-b> is set. Output format
-is set to I<dump> (see above).
+B<--nocomments> is enforced, see above.
 
-=item B<-g> I<table> (postings per group table)
+=item B<--groupsdb> I<database table>
 
 Override I<DBTableGrps> from F<newsstats.conf>.
 
@@ -462,36 +586,40 @@ Override I<DBTableGrps> from F<newsstats.conf>.
 
 =head1 INSTALLATION
 
-See doc/INSTALL.
+See L<doc/INSTALL>.
 
 =head1 EXAMPLES
 
-Show number of postings per group for lasth month in I<dump> format:
+Show number of postings per group for lasth month in I<pretty> format:
 
     groupstats
 
 Show that report for January of 2010 and de.alt.* plus de.test,
 including display of hierarchy levels:
 
-    groupstats -m 2010-01 -n de.alt.*:de.test -s
+    groupstats --month 2010-01 --newsgroups de.alt.*:de.test --sums
 
-Show that report for the year of 2010 in I<pretty> format:
-
-    groupstats -p 2010-01:2010-12 -o pretty
-
-Only show newsgroups with less than 30 postings last month, ordered
+Only show newsgroups with 30 postings or less last month, ordered
 by number of postings, descending, in I<pretty> format:
 
-    groupstats -iqdt 30 -o pretty
+    groupstats --upper 30 --order-by postings-desc
 
-Show top 10 for the first half-year of of 2010 in I<pretty> format:
+Show the total of all postings for the year of 2010 for all groups that
+had 30 postings or less in every single month in that year, ordered by
+number of postings in descending order:
 
-    groupstats -p 2010-01:2010-06 -b 10 -o pretty
+    groupstats -m 2010-01:2010-12 -u 30 -b level -r sums -o postings-desc
 
-Report all groups that had less than 30 postings every singele month
-in the year of 2010 (I<pretty> format is forced)
+The same for the average number of postings in the year of 2010:
 
-    groupstats -p 2010-01:2010-12 -il 30
+    groupstats -m 2010-01:2010-12 -u 30 -b level -r avg -o postings-desc
+
+List number of postings per group for eacht month of 2010 and redirect
+output to one file for each month, namend stats-2010-01 and so on, in
+machine-readable form (without formatting):
+
+    groupstats -m 2010-01:2010-12 -f dump --filetemplate stats
+
 
 =head1 FILES
 
@@ -507,7 +635,7 @@ Library functions for the NewsStats package.
 
 =item F<newsstats.conf>
 
-Runtime configuration file for B<yapfaq>.
+Runtime configuration file.
 
 =back
 
@@ -522,11 +650,11 @@ bug tracker at L<http://bugs.th-h.de/>!
 
 =item -
 
-doc/README
+L<doc/README>
 
 =item -
 
-doc/INSTALL
+l>doc/INSTALL>
 
 =item -
 
@@ -542,7 +670,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.
