@@ -343,13 +343,13 @@ sub SplitPeriod {
 sub ListMonth {
 ################################################################################
 ### return a list of months (YYYY-MM) between start and end month
-### IN : $StartMonth, $EndMonth
-### OUT: @Months: array containing all months from $StartMonth to $EndMonth
-  my ($StartMonth, $EndMonth) = @_;
-  return (undef,undef)
-    if ($StartMonth !~ /^\d{4}-\d{2}$/ or $EndMonth !~ /^\d{4}-\d{2}$/);
-  # return if $StartMonth = $EndMonth
-  return ($StartMonth) if ($StartMonth eq $EndMonth);
+### IN : $MonthExpression ('YYYY-MM' or 'YYYY-MM to YYYY-MM')
+### OUT: @Months: array containing all months from $MonthExpression enumerated
+  my ($MonthExpression )= @_;
+  # return if single month
+  return ($MonthExpression) if ($MonthExpression =~ /^\d{4}-\d{2}$/);
+  # parse $MonthExpression
+  my ($StartMonth, $EndMonth) = split(' to ',$MonthExpression);
   # set $Year, $Month from $StartMonth
   my ($Year, $Month) = split /-/, $StartMonth;
   # define @Months
