@@ -102,10 +102,6 @@ if ($Conf{'TLH'}) {
   };
 };
 
-# read list of newsgroups from --checkgroups
-# into a hash
-my %ValidGroups = %{ReadGroupList($OptCheckgroupsFile)} if $OptCheckgroupsFile;
-
 ### init database
 my $DBHandle = InitDB(\%Conf,1);
 
@@ -116,6 +112,11 @@ foreach my $Month (&ListMonth($Period)) {
   print "---------- $Month ----------\n" if $OptDebug;
 
   if ($OptStatsType eq 'all' or $OptStatsType eq 'groups') {
+    # read list of newsgroups from --checkgroups
+    # into a hash
+    my %ValidGroups = %{ReadGroupList(sprintf('%s-%s',$OptCheckgroupsFile,$Month))}
+      if $OptCheckgroupsFile;
+
     ### ----------------------------------------------
     ### get groups data (number of postings per group)
     # get groups data from raw table for given month
@@ -195,7 +196,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats] [B<-c> I<checkgroups file>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
 
 =head1 REQUIREMENTS
 
@@ -289,15 +290,23 @@ Set processing type to one of I<all> and I<groups>. Defaults to all
 (and is currently rather pointless as only I<groups> has been
 implemented).
 
-=item B<-c>, B<--checkgroups> I<filename>
+=item B<-c>, B<--checkgroups> I<filename template>
 
-Check each group against a list of valid newsgroups read from
-I<filename>, one group on each line and ignoring everything after the
-first whitespace (so you can use a file in checkgroups format or (part
-of) your INN active file).
+Check each group against a list of valid newsgroups read from a file,
+one group on each line and ignoring everything after the first
+whitespace (so you can use a file in checkgroups format or (part of)
+your INN active file).
 
-Newsgroups not found in I<filename> will be dropped (and logged to
-STDERR), and newsgroups found in I<filename> but having no postings
+The filename is taken from I<filename template>, amended by each B<--
+month> B<gatherstats> is processing, so that
+
+    gatherstats -m 2010-01:2010-12 -c checkgroups
+
+will check against F<checkgroups-2010-01> for January 2010, against
+F<checkgroups-2010-02> for February 2010 and so on.
+
+Newsgroups not found in the checkgroups file will be dropped (and
+logged to STDERR), and newsgroups found there but having no postings
 will be added with a count of 0 (and logged to STDERR).
 
 =item B<--hierarchy> I<TLH> (newsgroup hierarchy)
@@ -341,9 +350,9 @@ Process all types of information for January of 2010:
     gatherstats --month 2010-01
 
 Process only number of postings for the year of 2010,
-checking against checkgroups-2010.txt:
+checking against checkgroups-*:
 
-    gatherstats -m 2010-01:2010-12 -s groups -c checkgroups-2010.txt
+    gatherstats -m 2010-01:2010-12 -s groups -c checkgroups
 
 =head1 FILES
 
