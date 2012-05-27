@@ -230,8 +230,9 @@ sub ReadGroupList {
   my %ValidGroups;
   open (my $LIST,"<$Filename") or &Bleat(2,"Cannot read $Filename: $!");
   while (<$LIST>) {
-    s/^(\S+).*$/$1/;
+    s/^\s*(\S+).*$/$1/;
     chomp;
+    next if /^$/;
     $ValidGroups{$_} = '1';
   };
   close $LIST;
