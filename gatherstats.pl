@@ -85,9 +85,15 @@ if ($Conf{'TLH'}) {
   }
   # strip whitespace
   $TLH =~ s/\s//g;
+  # add trailing dots if none are present yet
+  # (using negative look-behind assertions)
+  $TLH =~ s/(?<!\.):/.:/g;
+  $TLH =~ s/(?<!\.)$/./;
   # check for illegal characters
   &Bleat(2,'Config error - illegal characters in TLH definition!')
     if ($TLH !~ /^[a-zA-Z0-9:]+$/);
+  # escape dots
+  $TLH =~ s/\./\\./g;
   if ($TLH =~ /:/) {
     # reformat $TLH from a:b to (a)|(b),
     # e.g. replace ':' by ')|('
