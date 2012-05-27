@@ -184,7 +184,7 @@ sub ListNewsgroups {
     next if($TLH and !/^$TLH/);
     # don't count invalid newsgroups
     if(%ValidGroups and !defined($ValidGroups{$_})) {
-      &Bleat(1,sprintf("DROPPED: %s",$_));
+      warn (sprintf("DROPPED: %s\n",$_));
       next;
     }
     # add original newsgroup to %Newsgroups
