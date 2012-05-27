@@ -42,7 +42,6 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
       names - would be nice.
 
   + install/install.pl
-    - Complete rewrite (like groupstats.pl, include changes in NewsStats.pm)
     - Add / enhance / test error handling
     - General tests and optimisations
 
