@@ -91,7 +91,7 @@ if ($Conf{'TLH'}) {
   $TLH =~ s/(?<!\.)$/./;
   # check for illegal characters
   &Bleat(2,'Config error - illegal characters in TLH definition!')
-    if ($TLH !~ /^[a-zA-Z0-9:]+$/);
+    if ($TLH !~ /^[a-zA-Z0-9:+.-]+$/);
   # escape dots
   $TLH =~ s/\./\\./g;
   if ($TLH =~ /:/) {
