@@ -78,7 +78,7 @@ my $TLH;
 if ($Conf{'TLH'}) {
   # $Conf{'TLH'} is parsed as an array by Config::Auto;
   # make a flat list again, separated by :
-  if (ref($TLH) eq 'ARRAY') {
+  if (ref($Conf{'TLH'}) eq 'ARRAY') {
     $TLH = join(':',@{$Conf{'TLH'}});
   } else {
     $TLH  = $Conf{'TLH'};
@@ -90,7 +90,7 @@ if ($Conf{'TLH'}) {
     if ($TLH !~ /^[a-zA-Z0-9:]+$/);
   if ($TLH =~ /:/) {
     # reformat $TLH from a:b to (a)|(b),
-    # e.g. replace '.' by '|'
+    # e.g. replace ':' by ')|('
     $TLH =~ s/:/)|(/g;
     $TLH = '(' . $TLH . ')';
   };
