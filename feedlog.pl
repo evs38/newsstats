@@ -28,6 +28,42 @@ use DBI;
 use Getopt::Long qw(GetOptions);
 Getopt::Long::config ('bundling');
 
+################################# Subroutines ##################################
+
+sub PrepareDB {
+### initialise database connection, prepare statement
+### and catch errors
+### IN : \%Conf   : reference to configuration hash
+### OUT: $DBHandle: database handle
+###      $DBQuery : prepared statement
+  our ($DBHandle, $DBQuery, $OptQuiet);
+  my ($ConfigR) = @_;
+  my %Conf = %$ConfigR;
+  # drop current database connection - hard, if necessary
+  if ($DBHandle) {
+    $DBHandle->disconnect;
+    undef $DBHandle;
+  };
+  # connect to database; try again every 5 seconds
+  while (!$DBHandle) {
+    $DBHandle = InitDB($ConfigR,0);
+    if (!$DBHandle) {
+      syslog(LOG_CRIT, 'Database connection failed: %s', $DBI::errstr);
+      sleep(5);
+    } else {;
+      syslog(LOG_NOTICE, "Database connection (re-)established successfully.") if !$OptQuiet;
+    }
+  };
+  $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s (day,date,mid,
+                                         timestamp,token,size,peer,path,
+                                         newsgroups,headers)
+                                         VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                         $Conf{'DBDatabase'},
+                                         $Conf{'DBTableRaw'}));
+  return ($DBHandle,$DBQuery);
+}
+
+
 ################################# Main program #################################
 
 ### read commandline options
@@ -45,16 +81,7 @@ openlog($0, 'nofatal,pid', LOG_NEWS);
 syslog(LOG_NOTICE, "$MyVersion starting up.") if !$OptQuiet;
 
 ### init database
-my $DBHandle = InitDB(\%Conf,0);
-if (!$DBHandle) {
-  syslog(LOG_CRIT, 'Database connection failed: %s', $DBI::errstr);
-  while (1) {}; # go into endless loop to suppress further errors and respawning
-};
-my $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s (day,date,mid,
-                                         timestamp,token,size,peer,path,
-                                         newsgroups,headers)
-                                         VALUES (?,?,?,?,?,?,?,?,?,?)",
-                                         $Conf{'DBDatabase'},$Conf{'DBTableRaw'}));
+my ($DBHandle,$DBQuery) = PrepareDB(\%Conf);
 
 ### main loop
 while (<>) {
@@ -84,7 +111,21 @@ while (<>) {
   # write to database
   if (!$DBQuery->execute($Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer,
                          $Path, $Newsgroups, $Headers)) {
-    syslog(LOG_ERR, 'Database error: %s', $DBI::errstr);
+    syslog(LOG_ERR, 'Database error %s while processing %s: %s',
+           $DBI::err, $Mid, $DBI::errstr);
+    # if "MySQL server has gone away", try to recover
+    if ($DBI::err == 2006) {
+      # try to reconnect to database
+      ($DBHandle,$DBQuery) = PrepareDB(\%Conf);
+      # try to repeat the write attempt as before
+      if (!$DBQuery->execute($Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer,
+                             $Path, $Newsgroups, $Headers)) {
+        syslog(LOG_ERR, '%s was dropped and lost.',$Mid);
+      };
+    # otherwise log missing posting
+    } else {
+      syslog(LOG_ERR, '%s was dropped and lost.',$Mid);
+    };
   };
   $DBQuery->finish;
   

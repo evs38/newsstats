@@ -46,9 +46,6 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
     - General tests and optimisations
 
   + feedlog.pl
-    - Gracefully handle interruptions to database connection, at least log
-      lost postings (Bug #30).
-    - Buffer output that cannot be written to database (Bug #31).
     - Add / enhance / test error handling
     - General tests and optimisations
 
