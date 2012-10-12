@@ -1,4 +1,4 @@
-NewsStats 0.1  (c) 2010 Thomas Hochstein <thh@inter.net>
+NewsStats 0.1  (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 
 NewsStats is a software package for gathering statistical data live
 from a Usenet feed and subsequent examination.
@@ -20,7 +20,8 @@ INSTALLATION INSTRUCTIONS
 
      # tar -xzf newsstats-nn.tar.gz
 
-     Scripts in this path should be executable by the news user.
+     Scripts in this path - at least feedlog.pl - should be executable by the
+     news user.
 
 2) Configuration
 
@@ -80,8 +81,8 @@ INSTALLATION INSTRUCTIONS
    * Edit your 'newsfeeds' file and insert something like
 
      ## gather statistics for NewsStats
-     newsstats!
-             :!*,de.*
+     newsstats!\
+             :!*,de.*\
              :Tc,WmtfbsPNH,Ac:/path/to/feedlog.pl
 
    * You should only feed that hierarchy (those hierarchies ...) to
@@ -109,7 +110,7 @@ INSTALLATION INSTRUCTIONS
    Everything should be going smoothly now.
 
    * If INN is spewing error messages to 'errlog' or reporting
-     continous respaws of feedlog.pl to 'news.notice', stop your feed:
+     continous respawns of feedlog.pl to 'news.notice', stop your feed:
 
      # ctlinnd drop 'newsstats!'
 
