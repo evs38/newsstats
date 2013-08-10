@@ -132,7 +132,7 @@ foreach my $Month (&ListMonth($Period)) {
     # count postings per group
     my %Postings;
     while (($_) = $DBQuery->fetchrow_array) {
-      # get list oft newsgroups and hierarchies from Newsgroups:
+      # get list of newsgroups and hierarchies from Newsgroups:
       my %Newsgroups = ListNewsgroups($_,$TLH,
                                       $OptCheckgroupsFile ? \%ValidGroups : '');
       # count each newsgroup and hierarchy once
@@ -145,12 +145,19 @@ foreach my $Month (&ListMonth($Period)) {
     if (%ValidGroups) {
       foreach (sort keys %ValidGroups) {
         if (!defined($Postings{$_})) {
-          $Postings{$_} = 0 ;
-          warn (sprintf("ADDED: %s as empty group\n",$_));
+          # expand newsgroup with hierarchies
+          my @Newsgroups = ParseHierarchies($_);
+          # add each empty newsgroup and empty hierarchies, too, as needed
+          foreach (@Newsgroups) {
+            if (!defined($Postings{$_})) {
+              $Postings{$_} = 0;
+              warn (sprintf("ADDED: %s as empty group\n",$_));
+            };
+          };
         }
       };
     };
-
+    
     # delete old data for that month
     if (!$OptTest) {
       $DBQuery = $DBHandle->do(sprintf("DELETE FROM %s.%s WHERE month = ?",
