@@ -29,6 +29,9 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
   - Add other reports
     NewsStats should include some other kinds of reports (stats on used clients,
     on postings hosts/servers, ...)
+  - Add tools for database management
+    NewsStats should offer tools e.g. to inject postings into the 'raw' database,
+    or to split databases.
 
 * Individual improvements
   + NewsStats.pm
@@ -43,6 +46,9 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
     - General tests and optimisations
 
   + feedlog.pl
+    - Gracefully handle interruptions to database connection, at least log
+      lost postings (Bug #30).
+    - Buffer output that cannot be written to database (Bug #31).
     - Add / enhance / test error handling
     - General tests and optimisations
 
@@ -54,13 +60,6 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
     - General tests and optimisations
 
   + groupstats.pl
-    - output: fix formatting - GetMaxLength does not work for special queries
-      like -l or -b
-    - beautify output (formats / captions)
-    - -a: improve code - it doesn't make that much sense to get first/last
-      month from database just to query that same database with a time period
-      that equals no time period ... this part of the WHERE clause should be
-      dropped instead
     - better modularisation (code reuse for other reports!)
     - Add / enhance / test error handling
     - General tests and optimisations
