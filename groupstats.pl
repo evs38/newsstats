@@ -372,6 +372,9 @@ Restrict output to those newgroups present in a file in checkgroups format
 (one newgroup name per line; everything after the first whitespace on each
 line is ignored). All other newsgroups will be removed from output.
 
+Contrary to B<gatherstats>, I<filename> is not a template, but refers to
+a single file in checkgroups format.
+
 =item B<-r>, B<--report> I<default|average|sums>
 
 Choose the report type: I<default>, I<average> or I<sums>
@@ -429,8 +432,8 @@ you'll get the following result:
 
 de.comp.datenbanken.misc has not been considered even though it has 38
 postings in total, because it has less than 25 postings in every single
-month. If you want to list all newsgroups with more than 25 postings U<in
-total>, you'll have to set the boundary type to I<sum>, see below.
+month. If you want to list all newsgroups with more than 25 postings
+I<in total>, you'll have to set the boundary type to I<sum>, see below.
 
 A boundary type of I<level> will show only those newsgroups - at all -
 that satisfy the boundaries in each and every single month. With the above
@@ -442,10 +445,10 @@ you'll get this result:
     de.comp.datenbanken.ms-access        293
 
 de.comp.datenbanken.mysql has not been considered because it had less than
-25 postings in 2012-02.
+25 postings in 2012-02 (only).
 
 You can use that to get a list of newsgroups that have more (or less) then
-x postings during the whole reporting period.
+x postings in every month during the whole reporting period.
 
 A boundary type of I<average> will show only those newsgroups - at all -that
 satisfy the boundaries on average. With the above list of newsgroups and

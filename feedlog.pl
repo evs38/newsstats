@@ -200,7 +200,7 @@ Suppress logging to syslog.
 
 =head1 INSTALLATION
 
-See L<doc/INSTALL.>
+See L<doc/INSTALL>.
 
 =head1 EXAMPLES
 

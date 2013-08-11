@@ -205,7 +205,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
 
 =head1 REQUIREMENTS
 
@@ -292,7 +292,6 @@ Set processing period to a single month in YYYY-MM format or to a time
 period between two month in YYYY-MM:YYYY-MM format (two month, separated
 by a colon). 
 
-
 =item B<-s>, B<--stats> I<type>
 
 Set processing type to one of I<all> and I<groups>. Defaults to all
@@ -306,8 +305,9 @@ one group on each line and ignoring everything after the first
 whitespace (so you can use a file in checkgroups format or (part of)
 your INN active file).
 
-The filename is taken from I<filename template>, amended by each B<--
-month> B<gatherstats> is processing, so that
+The filename is taken from I<filename template>, amended by each
+B<--month> B<gatherstats> is processing in the form of I<template-YYYY-MM>,
+so that
 
     gatherstats -m 2010-01:2010-12 -c checkgroups
 
