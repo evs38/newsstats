@@ -154,9 +154,10 @@ if ($OptReportType and $OptReportType ne 'default') {
 ### get length of longest newsgroup name delivered by query
 ### for formatting purposes
 my $Field = ($GroupBy eq 'month') ? 'newsgroup' : 'month';
-my $MaxLength = &GetMaxLength($DBHandle,$Conf{'DBTableGrps'},
-                              $Field,$SQLWhereClause,$SQLHavingClause,
-                              @SQLBindNewsgroups);
+my ($MaxLength,$MaxValLength) = &GetMaxLength($DBHandle,$Conf{'DBTableGrps'},
+                                              $Field,'postings',$SQLWhereClause,
+                                              $SQLHavingClause,
+                                              @SQLBindNewsgroups);
 
 ### build and execute SQL query
 my ($DBQuery);
@@ -241,7 +242,7 @@ if ($OptCaptions && $OptComments) {
 # output data
 &OutputData($OptFormat,$OptComments,$GroupBy,$Precision,
             $OptCheckgroupsFile ? $ValidGroups : '',
-            $OptFileTemplate,$DBQuery,$MaxLength);
+            $OptFileTemplate,$DBQuery,$MaxLength,$MaxValLength);
 
 ### close handles
 $DBHandle->disconnect;

@@ -382,16 +382,17 @@ sub OutputData {
 ###      $FileTempl: file name template (--filetemplate): filetempl-YYYY-MM
 ###      $DBQuery  : database query handle with executed query,
 ###                 containing $Month, $Key, $Value
-###      $PadGroup : padding length for key field (optional) for 'pretty'
+###      $PadField : padding length for key field (optional) for 'pretty'
+###      $PadValue : padding length for value field (optional) for 'pretty'
   my ($Format, $Comments, $GroupBy, $Precision, $ValidKeys, $FileTempl,
-      $DBQuery, $PadGroup) = @_;
+      $DBQuery, $PadField, $PadValue) = @_;
   my %ValidKeys = %{$ValidKeys} if $ValidKeys;
   my ($FileName, $Handle, $OUT);
   our $LastIteration;
   
   # define output types
   my %LegalOutput;
-  @LegalOutput{('dump',,'list','pretty')} = ();
+  @LegalOutput{('dump','list','pretty')} = ();
   # bail out if format is unknown
   &Bleat(2,"Unknown output type '$Format'!") if !exists($LegalOutput{$Format});
 
@@ -427,7 +428,7 @@ sub OutputData {
       $Handle = $OUT;
     };
     print $Handle &FormatOutput($Format, $Comments, $Caption, $Key, $Value,
-                                $Precision, $PadGroup);
+                                $Precision, $PadField, $PadValue);
     $LastIteration = $Caption;
   };
   close $OUT if ($FileTempl);
@@ -443,9 +444,11 @@ sub FormatOutput {
 ###      $Key      : newsgroup, client, ... or $Month, as above
 ###      $Value    : number of postings with that attribute
 ###      $Precision: number of digits right of decimal point (0 or 2)
-###      $PadGroup : padding length for key field (optional) for 'pretty'
+###      $PadField : padding length for key field (optional) for 'pretty'
+###      $PadValue : padding length for value field (optional) for 'pretty'
 ### OUT: $Output: formatted output
-  my ($Format, $Comments, $Caption, $Key, $Value, $Precision, $PadGroup) = @_;
+  my ($Format, $Comments, $Caption, $Key, $Value, $Precision, $PadField,
+      $PadValue) = @_;
   my ($Output);
   # keep last caption in mind
   our ($LastIteration);
@@ -462,8 +465,13 @@ sub FormatOutput {
     # output as a table
     $Output = sprintf ("# ----- %s:\n",$Caption)
       if ($Comments and (!defined($LastIteration) or $Caption ne $LastIteration));
-    $Output .= sprintf ($PadGroup ? sprintf("%%-%us %%10.*f\n",$PadGroup) :
-                        "%s %.*f\n",$Key,$Precision,$Value);
+    # increase $PadValue for numbers with decimal point
+    $PadValue += $Precision+1 if $Precision;
+    # add padding if $PadField is set; $PadValue HAS to be set then
+    $Output .= sprintf ($PadField ?
+                        sprintf("%%-%us%%s %%%u.*f\n",$PadField,$PadValue) :
+                        "%s%s %.*f\n",$Key,$Comments ? ':' : '',
+                        $Precision,$Value);
   };
   return $Output;
 };
@@ -485,26 +493,30 @@ sub SQLHierarchies {
 ################################################################################
 sub GetMaxLength {
 ################################################################################
-### get length of longest field in future query result
-### IN : $DBHandle    : database handel
+### get length of longest fields in future query result
+### IN : $DBHandle    : database handle
 ###      $Table       : table to query
-###      $Field       : field to check
+###      $Field       : field (key!, i.e. month, newsgroup, ...) to check
+###      $Value       : field (value!, i.e. postings) to check
 ###      $WhereClause : WHERE clause
 ###      $HavingClause: HAVING clause
 ###      @BindVars    : bind variables for WHERE clause
-### OUT: $Length: length of longest instnace of $Field
-  my ($DBHandle,$Table,$Field,$WhereClause,$HavingClause,@BindVars) = @_;
-  my $DBQuery = $DBHandle->prepare(sprintf("SELECT MAX(LENGTH(%s)) ".
-                                           "FROM %s %s %s",$Field,$Table,
-                                           $WhereClause,$HavingClause ?
+### OUT: $FieldLength : length of longest instance of $Field
+###      $ValueLength : length of longest instance of $Value
+  my ($DBHandle,$Table,$Field,$Value,$WhereClause,$HavingClause,@BindVars) = @_;
+  my $DBQuery = $DBHandle->prepare(sprintf("SELECT MAX(LENGTH(%s)),".
+                                           "MAX(%s) ".
+                                           "FROM %s %s %s",$Field,,$Value,
+                                           $Table,$WhereClause,$HavingClause ?
                                            'GROUP BY newsgroup' . $HavingClause .
                                            ' ORDER BY LENGTH(newsgroup) '.
                                            'DESC LIMIT 1': ''));
   $DBQuery->execute(@BindVars) or &Bleat(1,sprintf("Can't get field length ".
                                                    "for '%s' from table '%s': ".
                                                    "$DBI::errstr",$Field,$Table));
-  my ($Length) = $DBQuery->fetchrow_array;
-  return $Length;
+  my ($FieldLength,$ValueMax) = $DBQuery->fetchrow_array;
+  my $ValueLength = length($ValueMax) if ($ValueMax);
+  return ($FieldLength,$ValueLength);
 };
 
 ################################################################################
