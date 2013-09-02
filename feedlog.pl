@@ -1,4 +1,4 @@
-#! /usr/bin/perl -W
+#! /usr/bin/perl
 #
 # feedlog.pl
 #
@@ -7,7 +7,7 @@
 # 
 # It is part of the NewsStats package.
 #
-# Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+# Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 #
 # It can be redistributed and/or modified under the same terms under 
 # which Perl itself is published.
@@ -18,6 +18,7 @@ BEGIN {
   push(@INC, dirname($0));
 }
 use strict;
+use warnings;
 
 use NewsStats;
 
@@ -25,26 +26,63 @@ use Sys::Syslog qw(:standard :macros);
 
 use Date::Format;
 use DBI;
+use Getopt::Long qw(GetOptions);
+Getopt::Long::config ('bundling');
+
+################################# Subroutines ##################################
+
+sub PrepareDB {
+### initialise database connection, prepare statement
+### and catch errors
+### IN : \%Conf   : reference to configuration hash
+### OUT: $DBHandle: database handle
+###      $DBQuery : prepared statement
+  our ($DBHandle, $DBQuery, $OptQuiet);
+  my ($ConfigR) = @_;
+  my %Conf = %$ConfigR;
+  # drop current database connection - hard, if necessary
+  if ($DBHandle) {
+    $DBHandle->disconnect;
+    undef $DBHandle;
+  };
+  # connect to database; try again every 5 seconds
+  while (!$DBHandle) {
+    $DBHandle = InitDB($ConfigR,0);
+    if (!$DBHandle) {
+      syslog(LOG_CRIT, 'Database connection failed: %s', $DBI::errstr);
+      sleep(5);
+    } else {;
+      syslog(LOG_NOTICE, "Database connection (re-)established successfully.") if !$OptQuiet;
+    }
+  };
+  $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s (day,date,mid,
+                                         timestamp,token,size,peer,path,
+                                         newsgroups,headers)
+                                         VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                         $Conf{'DBDatabase'},
+                                         $Conf{'DBTableRaw'}));
+  return ($DBHandle,$DBQuery);
+}
+
 
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('qd');
+my ($OptDebug,$OptQuiet);
+GetOptions ('d|debug!'        => \$OptDebug,
+            'q|test!'         => \$OptQuiet,
+            'h|help'          => \&ShowPOD,
+            'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig('newsstats.conf')};
+my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
 
 ### init syslog
-openlog($MySelf, 'nofatal,pid', LOG_NEWS);
-syslog(LOG_NOTICE, "$MyVersion starting up.") if !$Options{'q'};
+openlog($0, 'nofatal,pid', LOG_NEWS);
+syslog(LOG_NOTICE, "$MyVersion starting up.") if !$OptQuiet;
 
 ### init database
-my $DBHandle = InitDB(\%Conf,0);
-if (!$DBHandle) {
-  syslog(LOG_CRIT, 'Database connection failed: %s', $DBI::errstr);
-  while (1) {}; # go into endless loop to suppress further errors and respawning
-};
-my $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s (day,date,mid,timestamp,token,size,peer,path,newsgroups,headers) VALUES (?,?,?,?,?,?,?,?,?,?)",$Conf{'DBDatabase'},$Conf{'DBTableRaw'}));
+my ($DBHandle,$DBQuery) = PrepareDB(\%Conf);
 
 ### main loop
 while (<>) {
@@ -72,17 +110,35 @@ while (<>) {
   my $Date = time2str("%Y-%m-%d %H:%M:%S", $Timestamp);
 
   # write to database
-  if (!$DBQuery->execute($Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path, $Newsgroups, $Headers)) {
-    syslog(LOG_ERR, 'Database error: %s', $DBI::errstr);
+  if (!$DBQuery->execute($Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer,
+                         $Path, $Newsgroups, $Headers)) {
+    syslog(LOG_ERR, 'Database error %s while processing %s: %s',
+           $DBI::err, $Mid, $DBI::errstr);
+    # if "MySQL server has gone away", try to recover
+    if ($DBI::err == 2006) {
+      # try to reconnect to database
+      ($DBHandle,$DBQuery) = PrepareDB(\%Conf);
+      # try to repeat the write attempt as before
+      if (!$DBQuery->execute($Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer,
+                             $Path, $Newsgroups, $Headers)) {
+        syslog(LOG_ERR, '%s was dropped and lost.',$Mid);
+      };
+    # otherwise log missing posting
+    } else {
+      syslog(LOG_ERR, '%s was dropped and lost.',$Mid);
+    };
   };
   $DBQuery->finish;
   
-  warn sprintf("-----\nDay: %s\nDate: %s\nMID: %s\nTS: %s\nToken: %s\nSize: %s\nPeer: %s\nPath: %s\nNewsgroups: %s\nHeaders: %s\n",$Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path, $Newsgroups, $Headers) if $Options{'d'};
+  warn sprintf("-----\nDay: %s\nDate: %s\nMID: %s\nTS: %s\nToken: %s\n".
+               "Size: %s\nPeer: %s\nPath: %s\nNewsgroups: %s\nHeaders: %s\n",
+               $Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path,
+               $Newsgroups, $Headers) if $OptDebug;
 }
 
 ### close handles
 $DBHandle->disconnect;
-syslog(LOG_NOTICE, "$MySelf closing down.") if !$Options{'q'};
+syslog(LOG_NOTICE, "$0 closing down.") if !$OptQuiet;
 closelog();
 
 __END__
@@ -99,23 +155,7 @@ B<feedlog> [B<-Vhdq>]
 
 =head1 REQUIREMENTS
 
-See doc/README: Perl 5.8.x itself and the following modules from CPAN:
-
-=over 2
-
-=item -
-
-Config::Auto
-
-=item -
-
-Date::Format
-
-=item -
-
-DBI
-
-=back
+See L<doc/README>.
 
 =head1 DESCRIPTION
 
@@ -131,29 +171,29 @@ terminating would only result in a rapid respawn.
 
 =head2 Configuration
 
-F<feedlog.pl> will read its configuration from F<newsstats.conf> which
+B<feedlog> will read its configuration from F<newsstats.conf> which
 should be present in the same directory via Config::Auto.
 
-See doc/INSTALL for an overview of possible configuration options.
+See L<doc/INSTALL> for an overview of possible configuration options.
 
 =head1 OPTIONS
 
 =over 3
 
-=item B<-V> (version)
+=item B<-V>, B<--version>
 
-Print out version and copyright information on B<yapfaq> and exit.
+Print out version and copyright information and exit.
 
-=item B<-h> (help)
+=item B<-h>, B<--help>
 
 Print this man page and exit.
 
-=item B<-d> (debug)
+=item B<-d>, B<--debug>
 
 Output debugging information to STDERR while parsing STDIN. You'll
 find that information most probably in your B<INN> F<errlog> file.
 
-=item B<-q> (quiet)
+=item B<-q>, B<--quiet>
 
 Suppress logging to syslog.
 
@@ -161,7 +201,7 @@ Suppress logging to syslog.
 
 =head1 INSTALLATION
 
-See doc/INSTALL.
+See L<doc/INSTALL>.
 
 =head1 EXAMPLES
 
@@ -172,7 +212,7 @@ Set up a feed like that in your B<INN> F<newsfeeds> file:
             :!*,de.*
             :Tc,WmtfbsPNH,Ac:/path/to/feedlog.pl
 
-See doc/INSTALL for further information.
+See L<doc/INSTALL> for further information.
 
 =head1 FILES
 
@@ -188,7 +228,7 @@ Library functions for the NewsStats package.
 
 =item F<newsstats.conf>
 
-Runtime configuration file for B<yapfaq>.
+Runtime configuration file.
 
 =back
 
@@ -203,11 +243,11 @@ bug tracker at L<http://bugs.th-h.de/>!
 
 =item -
 
-doc/README
+L<doc/README>
 
 =item -
 
-doc/INSTALL
+L<doc/INSTALL>
 
 =back
 
@@ -219,7 +259,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.

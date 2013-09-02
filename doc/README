@@ -1,4 +1,4 @@
-NewsStats 0.1  (c) 2010 Thomas Hochstein <thh@inter.net>
+NewsStats 0.1  (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 
 NewsStats is a software package for gathering statistical data live
 from a Usenet feed and subsequent examination.
@@ -12,7 +12,7 @@ the Free Software Foundation.
 What's that?
 
     There's a multitude of tools for the statistical examination of
-    newsgroups: number of postings month or per person, longest
+    newsgroups: number of postings per month or per person, longest
     threads, and so on (see <http://th-h.de/infos/usenet/stats.php>
     [German language] for an incomplete list). Most of them use a per-
     newsgroup approach while NewsStats is hierarchy oriented.
@@ -27,7 +27,7 @@ Workflow
 
     That raw data will be regularly - e.g. monthly - processed to a
     second set of database tables each dedicated to a certain
-    statistical aspect, e.g. number of postings per group per month.
+    statistical aspect, e.g. number of postings per group and month.
 
     Several kinds of reports can then be generated from those result
     tables.
@@ -35,8 +35,8 @@ Workflow
 Prerequisites
 
     NewsStats is written in Perl (5.8.x and above) and makes use of a
-    MySQL database, so you'll need Perl, some modules, mysql and, of
-    course, an INN.
+    MySQL database, so you will need Perl, some modules, mysql and, of
+    course, INN.
 
     * Perl 5.8.x with standard modules
       - Cwd
@@ -62,12 +62,12 @@ Getting Started
     table. See the feedlog.pl man page for more information.
 
     You can process that data via 'gatherstats.pl'; currently only the
-    tabulation of postings per group per month is supported. More to
+    tabulation of postings per group and month is supported. More to
     come. See the gatherstats.pl man page for more information.
 
     Report generation is handled by specialised scripts for each
     report type. Currently only reports on the number of postings per
-    group per month are supported; you can use 'groupstats.pl' for
+    group and month are supported; you can use 'groupstats.pl' for
     this. See the groupstats.pl man page for more information.
 
 Reporting Bugs
@@ -95,3 +95,4 @@ Author
 
     Thomas Hochstein <thh@inter.net>
     <http://th-h.de/>
+

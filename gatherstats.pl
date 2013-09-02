@@ -1,4 +1,4 @@
-#! /usr/bin/perl -W
+#! /usr/bin/perl
 #
 # gatherstats.pl
 #
@@ -7,7 +7,7 @@
 # 
 # It is part of the NewsStats package.
 #
-# Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+# Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 #
 # It can be redistributed and/or modified under the same terms under 
 # which Perl itself is published.
@@ -18,117 +18,173 @@ BEGIN {
   push(@INC, dirname($0));
 }
 use strict;
+use warnings;
 
-use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups ReadGroupList);
+use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups ParseHierarchies ReadGroupList);
 
 use DBI;
+use Getopt::Long qw(GetOptions);
+Getopt::Long::config ('bundling');
 
 ################################# Definitions ##################################
 
 # define types of information that can be gathered
 # all / groups (/ clients / hosts)
-my %LegalTypes;
-@LegalTypes{('all','groups')} = ();
+my %LegalStats;
+@LegalStats{('all','groups')} = ();
 
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('dom:p:t:l:n:r:g:c:s:');
+my ($OptCheckgroupsFile,$OptClientsDB,$OptDebug,$OptGroupsDB,$OptTLH,
+    $OptHostsDB,$OptMonth,$OptRawDB,$OptStatsType,$OptTest);
+GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
+            'clientsdb=s'     => \$OptClientsDB,
+            'd|debug!'        => \$OptDebug,
+            'groupsdb=s'      => \$OptGroupsDB,
+            'hierarchy=s'     => \$OptTLH,
+            'hostsdb=s'       => \$OptHostsDB,
+            'm|month=s'       => \$OptMonth,
+            'rawdb=s'         => \$OptRawDB,
+            's|stats=s'       => \$OptStatsType,
+            't|test!'         => \$OptTest,
+            'h|help'          => \&ShowPOD,
+            'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig('newsstats.conf')};
+my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
 
 ### override configuration via commandline options
 my %ConfOverride;
-$ConfOverride{'DBTableRaw'}   = $Options{'r'} if $Options{'r'};
-$ConfOverride{'DBTableGrps'}  = $Options{'g'} if $Options{'g'};
-$ConfOverride{'DBTableClnts'} = $Options{'c'} if $Options{'c'};
-$ConfOverride{'DBTableHosts'} = $Options{'s'} if $Options{'s'};
-$ConfOverride{'TLH'} = $Options{'n'} if $Options{'n'};
+$ConfOverride{'DBTableRaw'}   = $OptRawDB if $OptRawDB;
+$ConfOverride{'DBTableGrps'}  = $OptGroupsDB if $OptGroupsDB;
+$ConfOverride{'DBTableClnts'} = $OptClientsDB if $OptClientsDB;
+$ConfOverride{'DBTableHosts'} = $OptHostsDB if $OptHostsDB;
+$ConfOverride{'TLH'} = $OptTLH if $OptTLH;
 &OverrideConfig(\%Conf,\%ConfOverride);
 
 ### get type of information to gather, defaulting to 'all'
-$Options{'t'} = 'all' if !$Options{'t'};
-die "$MySelf: E: Unknown type '-t $Options{'t'}'!\n" if !exists($LegalTypes{$Options{'t'}});
+$OptStatsType = 'all' if !$OptStatsType;
+&Bleat(2, sprintf("Unknown type '%s'!", $OptStatsType))
+  if !exists($LegalStats{$OptStatsType});
 
-### get time period (-m or -p)
-my ($StartMonth,$EndMonth) = &GetTimePeriod($Options{'m'},$Options{'p'});
+### get time period from --month
+# get verbal description of time period, drop SQL code
+my ($Period) = &GetTimePeriod($OptMonth);
+&Bleat(2,"--month option has an invalid format - please use 'YYYY-MM' or ".
+         "'YYYY-MM:YYYY-MM'!") if (!$Period or $Period eq 'all time');
 
 ### reformat $Conf{'TLH'}
 my $TLH;
 if ($Conf{'TLH'}) {
   # $Conf{'TLH'} is parsed as an array by Config::Auto;
   # make a flat list again, separated by :
-  if (ref($TLH) eq 'ARRAY') {
+  if (ref($Conf{'TLH'}) eq 'ARRAY') {
     $TLH = join(':',@{$Conf{'TLH'}});
   } else {
     $TLH  = $Conf{'TLH'};
   }
   # strip whitespace
   $TLH =~ s/\s//g;
+  # add trailing dots if none are present yet
+  # (using negative look-behind assertions)
+  $TLH =~ s/(?<!\.):/.:/g;
+  $TLH =~ s/(?<!\.)$/./;
   # check for illegal characters
-  die "$MySelf: E: Config error - illegal characters in TLH definition\n" if ($TLH !~ /^[a-zA-Z0-9:]+$/);
+  &Bleat(2,'Config error - illegal characters in TLH definition!')
+    if ($TLH !~ /^[a-zA-Z0-9:+.-]+$/);
+  # escape dots
+  $TLH =~ s/\./\\./g;
   if ($TLH =~ /:/) {
-    # reformat $TLH form a:b to (a)|(b)
+    # reformat $TLH from a:b to (a)|(b),
+    # e.g. replace ':' by ')|('
     $TLH =~ s/:/)|(/g;
     $TLH = '(' . $TLH . ')';
   };
 };
 
-### read newsgroups list from -l
-my %ValidGroups = %{&ReadGroupList($Options{'l'})} if $Options{'l'};
-
 ### init database
 my $DBHandle = InitDB(\%Conf,1);
 
 ### get data for each month
-warn "$MySelf: W: Output only mode. Database is not updated.\n" if $Options{'o'};
-foreach my $Month (&ListMonth($StartMonth,$EndMonth)) {
+&Bleat(1,'Test mode. Database is not updated.') if $OptTest;
+foreach my $Month (&ListMonth($Period)) {
 
-  print "---------- $Month ----------\n" if $Options{'d'};
+  print "---------- $Month ----------\n" if $OptDebug;
 
-  if ($Options{'t'} eq 'all' or $Options{'t'} eq 'groups') {
+  if ($OptStatsType eq 'all' or $OptStatsType eq 'groups') {
+    # read list of newsgroups from --checkgroups
+    # into a hash
+    my %ValidGroups = %{ReadGroupList(sprintf('%s-%s',$OptCheckgroupsFile,$Month))}
+      if $OptCheckgroupsFile;
+
     ### ----------------------------------------------
     ### get groups data (number of postings per group)
     # get groups data from raw table for given month
-    my $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroups FROM %s.%s WHERE day LIKE ? AND NOT disregard",$Conf{'DBDatabase'},$Conf{'DBTableRaw'}));
-    $DBQuery->execute($Month.'-%') or die sprintf("$MySelf: E: Can't get groups data for %s from %s.%s: $DBI::errstr\n",$Month,$Conf{'DBDatabase'},$Conf{'DBTableRaw'});
+    my $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroups FROM %s.%s ".
+                                             "WHERE day LIKE ? AND NOT disregard",
+                                             $Conf{'DBDatabase'},
+                                             $Conf{'DBTableRaw'}));
+    $DBQuery->execute($Month.'-%')
+      or &Bleat(2,sprintf("Can't get groups data for %s from %s.%s: ".
+                          "$DBI::errstr\n",$Month,
+                          $Conf{'DBDatabase'},$Conf{'DBTableRaw'}));
 
     # count postings per group
     my %Postings;
     while (($_) = $DBQuery->fetchrow_array) {
-      # get list oft newsgroups and hierarchies from Newsgroups:
-      my %Newsgroups = ListNewsgroups($_,$TLH,$Options{'l'} ? \%ValidGroups : '');
+      # get list of newsgroups and hierarchies from Newsgroups:
+      my %Newsgroups = ListNewsgroups($_,$TLH,
+                                      $OptCheckgroupsFile ? \%ValidGroups : '');
       # count each newsgroup and hierarchy once
       foreach (sort keys %Newsgroups) {
         $Postings{$_}++;
       };
     };
 
-    # add valid but empty groups if -l is set
+    # add valid but empty groups if --checkgroups is set
     if (%ValidGroups) {
       foreach (sort keys %ValidGroups) {
         if (!defined($Postings{$_})) {
-          $Postings{$_} = 0 ;
+          # add current newsgroup as empty group
+          $Postings{$_} = 0;
           warn (sprintf("ADDED: %s as empty group\n",$_));
+          # add empty hierarchies for current newsgroup as needed
+          foreach (ParseHierarchies($_)) {
+            my $Hierarchy = $_ . '.ALL';
+            if (!defined($Postings{$Hierarchy})) {
+              $Postings{$Hierarchy} = 0;
+              warn (sprintf("ADDED: %s as empty group\n",$Hierarchy));
+            };
+          };
         }
       };
     };
-
+    
     # delete old data for that month
-    if (!$Options{'o'}) {
-      $DBQuery = $DBHandle->do(sprintf("DELETE FROM %s.%s WHERE month = ?",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}),undef,$Month)
-        or warn sprintf("$MySelf: E: Can't delete old groups data for %s from %s.%s: $DBI::errstr\n",$Month,$Conf{'DBDatabase'},$Conf{'DBTableGrps'});
+    if (!$OptTest) {
+      $DBQuery = $DBHandle->do(sprintf("DELETE FROM %s.%s WHERE month = ?",
+                                       $Conf{'DBDatabase'},$Conf{'DBTableGrps'}),
+                                       undef,$Month)
+        or &Bleat(2,sprintf("Can't delete old groups data for %s from %s.%s: ".
+                            "$DBI::errstr\n",$Month,
+                            $Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
     };
 
-    print "----- GroupStats -----\n" if $Options{'d'};
+    print "----- GroupStats -----\n" if $OptDebug;
     foreach my $Newsgroup (sort keys %Postings) {
-      print "$Newsgroup => $Postings{$Newsgroup}\n" if $Options{'d'};
-      if (!$Options{'o'}) {
+      print "$Newsgroup => $Postings{$Newsgroup}\n" if $OptDebug;
+      if (!$OptTest) {
         # write to database
-        $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s (month,newsgroup,postings) VALUES (?, ?, ?)",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
-        # $DBQuery = $DBHandle->prepare(sprintf("REPLACE INTO %s.%s (month,newsgroup,postings) VALUES (?, ?, ?)",$Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
-        $DBQuery->execute($Month, $Newsgroup, $Postings{$Newsgroup}) or die sprintf("$MySelf: E: Can't write groups data for %s/%s to %s.%s: $DBI::errstr\n",$Month,$Newsgroup,$Conf{'DBDatabase'},$Conf{'DBTableGrps'});
+        $DBQuery = $DBHandle->prepare(sprintf("INSERT INTO %s.%s ".
+                                              "(month,newsgroup,postings) ".
+                                              "VALUES (?, ?, ?)",
+                                              $Conf{'DBDatabase'},
+                                              $Conf{'DBTableGrps'}));
+        $DBQuery->execute($Month, $Newsgroup, $Postings{$Newsgroup})
+          or &Bleat(2,sprintf("Can't write groups data for %s/%s to %s.%s: ".
+                              "$DBI::errstr\n",$Month,$Newsgroup,
+                              $Conf{'DBDatabase'},$Conf{'DBTableGrps'}));
         $DBQuery->finish;
       };
     };
@@ -150,43 +206,31 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdo>] [B<-m> I<YYYY-MM>] [B<-p> I<YYYY-MM:YYYY-MM>] [B<-t> I<type>] [B<-l> I<filename>] [B<-n> I<TLH>] [B<-r> I<database table>] [B<-g> I<database table>] [B<-c> I<database table>] [B<-s> I<database table>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
 
 =head1 REQUIREMENTS
 
-See doc/README: Perl 5.8.x itself and the following modules from CPAN:
-
-=over 2
-
-=item -
-
-Config::Auto
-
-=item -
-
-DBI
-
-=back
+See L<doc/README>.
 
 =head1 DESCRIPTION
 
 This script will extract and process statistical information from a
 database table which is fed from F<feedlog.pl> for a given time period
 and write its results to (an)other database table(s). Entries marked
-with I<'disregard'> in the database will be ignored; currently, you have
-to set this flag yourself, using your database management tools. You
-can exclude erroneous entries that way (e.g. automatic reposts (think
-of cancels flood and resurrectors); spam; ...).
+with I<'disregard'> in the database will be ignored; currently, you
+have to set this flag yourself, using your database management tools.
+You can exclude erroneous entries that way (e.g. automatic reposts
+(think of cancels flood and resurrectors); spam; ...).
 
 The time period to act on defaults to last month; you can assign
-another month via the B<-m> switch or a time period via the B<-p>
-switch; the latter takes preference.
+another time period or a single month via the B<--month> option (see
+below).
 
 By default B<gatherstats> will process all types of information; you
-can change that using the B<-t> switch and assigning the type of
-information to process. Currently only processing of the number of
-postings per group per month is implemented anyway, so that doesn't
-matter yet.
+can change that using the B<--stats> option and assigning the type of
+information to process. Currently that doesn't matter yet as only
+processing of the number of postings per group per month is
+implemented anyway.
 
 Possible information types include:
 
@@ -205,86 +249,93 @@ respectively. A crossposting to de.alt.test and de.alt.admin, on the
 other hand, will be counted for de.alt.test and de.alt.admin each, but
 only once for de.alt.ALL and de.ALL.
 
-Data is written to I<DBTableGrps> (see doc/INSTALL).
+Data is written to I<DBTableGrps> (see L<doc/INSTALL>); you can
+override that default through the B<--groupsdb> option.
 
 =back
 
 =head2 Configuration
 
-F<gatherstats.pl> will read its configuration from F<newsstats.conf>
+B<gatherstats> will read its configuration from F<newsstats.conf>
 which should be present in the same directory via Config::Auto.
 
-See doc/INSTALL for an overview of possible configuration options.
+See L<doc/INSTALL> for an overview of possible configuration options.
 
-You can override configuration options via the B<-n>, B<-r>, B<-g>,
-B<-c> and B<-s> switches, respectively.
+You can override configuration options via the B<--hierarchy>,
+B<--rawdb>, B<--groupsdb>, B<--clientsdb> and B<--hostsdb> options,
+respectively.
 
 =head1 OPTIONS
 
 =over 3
 
-=item B<-V> (version)
+=item B<-V>, B<--version>
 
-Print out version and copyright information on B<yapfaq> and exit.
+Print out version and copyright information and exit.
 
-=item B<-h> (help)
+=item B<-h>, B<--help>
 
 Print this man page and exit.
 
-=item B<-d> (debug)
+=item B<-d>, B<--debug>
 
 Output debugging information to STDOUT while processing (number of
 postings per group).
 
-=item B<-o> (output only)
+=item B<-t>, B<--test>
 
-Do not write results to database. You should use B<-d> in conjunction
-with B<-o> ... everything else seems a bit pointless.
+Do not write results to database. You should use B<--debug> in
+conjunction with B<--test> ... everything else seems a bit pointless.
 
-=item B<-m> I<YYYY-MM> (month)
+=item B<-m>, B<--month> I<YYYY-MM[:YYYY-MM]>
 
-Set processing period to a month in YYYY-MM format. Ignored if B<-p>
-is set.
+Set processing period to a single month in YYYY-MM format or to a time
+period between two month in YYYY-MM:YYYY-MM format (two month, separated
+by a colon). 
 
-=item B<-p> I<YYYY-MM:YYYY-MM> (period)
-
-Set processing period to a time period between two month, each in
-YYYY-MM format, separated by a colon. Overrides B<-m>.
-
-=item B<-t> I<type> (type)
+=item B<-s>, B<--stats> I<type>
 
 Set processing type to one of I<all> and I<groups>. Defaults to all
 (and is currently rather pointless as only I<groups> has been
 implemented).
 
-=item B<-l> I<filename> (check against list)
+=item B<-c>, B<--checkgroups> I<filename template>
 
-Check each group against a list of valid newsgroups read from
-I<filename>, one group on each line and ignoring everything after the
-first whitespace (so you can use a file in checkgroups format or (part
-of) your INN active file).
+Check each group against a list of valid newsgroups read from a file,
+one group on each line and ignoring everything after the first
+whitespace (so you can use a file in checkgroups format or (part of)
+your INN active file).
 
-Newsgroups not found in I<filename> will be dropped (and logged to
-STDERR), and newsgroups found in I<filename> but having no postings
+The filename is taken from I<filename template>, amended by each
+B<--month> B<gatherstats> is processing in the form of I<template-YYYY-MM>,
+so that
+
+    gatherstats -m 2010-01:2010-12 -c checkgroups
+
+will check against F<checkgroups-2010-01> for January 2010, against
+F<checkgroups-2010-02> for February 2010 and so on.
+
+Newsgroups not found in the checkgroups file will be dropped (and
+logged to STDERR), and newsgroups found there but having no postings
 will be added with a count of 0 (and logged to STDERR).
 
-=item B<-n> I<TLH> (newsgroup hierarchy)
+=item B<--hierarchy> I<TLH> (newsgroup hierarchy)
 
 Override I<TLH> from F<newsstats.conf>.
 
-=item B<-r> I<table> (raw data table)
+=item B<--rawdb> I<table> (raw data table)
 
 Override I<DBTableRaw> from F<newsstats.conf>.
 
-=item B<-g> I<table> (postings per group table)
+=item B<--groupsdb> I<table> (postings per group table)
 
 Override I<DBTableGrps> from F<newsstats.conf>.
 
-=item B<-c> I<table> (client data table)
+=item B<--clientsdb> I<table> (client data table)
 
 Override I<DBTableClnts> from F<newsstats.conf>.
 
-=item B<-s> I<table> (server/host data table)
+=item B<--hostsdb> I<table> (host data table)
 
 Override I<DBTableHosts> from F<newsstats.conf>.
 
@@ -292,7 +343,7 @@ Override I<DBTableHosts> from F<newsstats.conf>.
 
 =head1 INSTALLATION
 
-See doc/INSTALL.
+See L<doc/INSTALL>.
 
 =head1 EXAMPLES
 
@@ -302,16 +353,16 @@ Process all types of information for lasth month:
 
 Do a dry run, showing results of processing:
 
-    gatherstats -do
+    gatherstats --debug --test
 
 Process all types of information for January of 2010:
 
-    gatherstats -m 2010-01
+    gatherstats --month 2010-01
 
 Process only number of postings for the year of 2010,
-checking against checkgroups-2010.txt:
+checking against checkgroups-*:
 
-    gatherstats -p 2010-01:2010-12 -t groups -l checkgroups-2010.txt
+    gatherstats -m 2010-01:2010-12 -s groups -c checkgroups
 
 =head1 FILES
 
@@ -327,7 +378,7 @@ Library functions for the NewsStats package.
 
 =item F<newsstats.conf>
 
-Runtime configuration file for B<yapfaq>.
+Runtime configuration file.
 
 =back
 
@@ -342,11 +393,11 @@ bug tracker at L<http://bugs.th-h.de/>!
 
 =item -
 
-doc/README
+L<doc/README>
 
 =item -
 
-doc/INSTALL
+L<doc/INSTALL>
 
 =back
 
@@ -358,7 +409,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.

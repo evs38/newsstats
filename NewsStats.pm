@@ -2,7 +2,7 @@
 #
 # Library functions for the NewsStats package.
 #
-# Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+# Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 #
 # This module can be redistributed and/or modified under the same terms under 
 # which Perl itself is published.
@@ -16,77 +16,69 @@ our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(
-  $MySelf
   $MyVersion
   $PackageVersion
-  ReadOptions
+  $FullPath
+  $HomePath
+  ShowVersion
+  ShowPOD
   ReadConfig
   OverrideConfig
   InitDB
+  Bleat
 );
 @EXPORT_OK = qw(
   GetTimePeriod
   LastMonth
-  CheckMonth
   SplitPeriod
   ListMonth
   ListNewsgroups
+  ParseHierarchies
   ReadGroupList
   OutputData
   FormatOutput
   SQLHierarchies
+  SQLSortOrder
   SQLGroupList
+  SQLSetBounds
+  SQLBuildClause
   GetMaxLength
 );
-%EXPORT_TAGS = ( TimePeriods => [qw(GetTimePeriod LastMonth CheckMonth SplitPeriod ListMonth)],
+%EXPORT_TAGS = ( TimePeriods => [qw(GetTimePeriod LastMonth SplitPeriod
+                                 ListMonth)],
                  Output      => [qw(OutputData FormatOutput)],
-                 SQLHelper   => [qw(SQLHierarchies SQLGroupList GetMaxLength)]);
+                 SQLHelper   => [qw(SQLHierarchies SQLSortOrder SQLGroupList
+                                 SQLSetBounds SQLBuildClause GetMaxLength)]);
 $VERSION = '0.01';
 our $PackageVersion = '0.01';
 
 use Data::Dumper;
 use File::Basename;
-use Getopt::Std;
 
 use Config::Auto;
 use DBI;
 
 #####-------------------------------- Vars --------------------------------#####
 
-our $MySelf = fileparse($0, '.pl');
-our $MyVersion = "$MySelf $::VERSION (NewsStats.pm $VERSION)";
+# trim the path
+our $FullPath = $0;
+our $HomePath = dirname($0);
+$0 =~ s%.*/%%;
+# set version string
+our $MyVersion = "$0 $::VERSION (NewsStats.pm $VERSION)";
 
 #####------------------------------- Basics -------------------------------#####
 
-################################################################################
-sub ReadOptions {
-################################################################################
-### read commandline options and act on standard options -h and -V
-### IN : $Params: list of legal commandline paramaters (without -h and -V)
-### OUT: a hash containing the commandline options
-  $Getopt::Std::STANDARD_HELP_VERSION = 1;
-
-  my ($Params) = @_;
-  my %Options;
-  
-  getopts('Vh'.$Params, \%Options);
-
-  # -V: display version
-  &ShowVersion if ($Options{'V'});
-
-  # -h: feed myself to perldoc
-  &ShowPOD if ($Options{'h'});
-
-  return %Options;
-};
 ################################################################################
 
 ################################################################################
 sub ShowVersion {
 ################################################################################
 ### display version and exit
-  print "NewsStats v$PackageVersion\n$MyVersion\nCopyright (c) 2010 Thomas Hochstein <thh\@inter.net>\n";
-  print "This program is free software; you may redistribute it and/or modify it under the same terms as Perl itself.\n";
+  print "NewsStats v$PackageVersion\n$MyVersion\n";
+  print "Copyright (c) 2010-2012 Thomas Hochstein <thh\@inter.net>\n";
+  print "This program is free software; you may redistribute it ".
+        "and/or modify it under the same terms as Perl itself.\n";
   exit(100);
 };
 ################################################################################
@@ -95,7 +87,7 @@ sub ShowVersion {
 sub ShowPOD {
 ################################################################################
 ### feed myself to perldoc and exit
-  exec('perldoc', $0);
+  exec('perldoc', $FullPath);
   exit(100);
 };
 ################################################################################
@@ -107,12 +99,24 @@ sub ReadConfig {
 ### IN : $ConfFile: config filename
 ### OUT: reference to a hash containing the configuration
   my ($ConfFile) = @_;
-  return Config::Auto::parse($ConfFile, format => 'equal');
+  # mandatory configuration options
+  my @Mandatory = ('DBDriver','DBHost','DBUser','DBPw','DBDatabase',
+                   'DBTableRaw','DBTableGrps');
+  # read config via Config::Auto
+  my $ConfR = Config::Auto::parse($ConfFile, format => 'equal');
+  my %Conf  = %{$ConfR};
+  # check for mandatory options
+  foreach (@Mandatory) {
+    &Bleat(2,sprintf("Mandatory configuration option %s is not set!",$_))
+      if (!defined($Conf{$_}));
+  }
+  # $Conf{'TLH'} is checked in gatherstats.pl
+  return $ConfR;
 };
 ################################################################################
 
 ################################################################################
-sub OverrideConfig  {
+sub OverrideConfig {
 ################################################################################
 ### override configuration values
 ### IN : $ConfigR  : reference to configuration hash
@@ -120,7 +124,8 @@ sub OverrideConfig  {
   my ($ConfigR,$OverrideR) = @_;
   my %Override = %$OverrideR;
   # Config hash empty?
-  warn "$MySelf W: Empty configuration hash passed to OverrideConfig().\n" if ( keys %$ConfigR < 1);
+  &Bleat(1,"Empty configuration hash passed to OverrideConfig()")
+    if ( keys %$ConfigR < 1);
   # return if no overrides
   return if (keys %Override < 1 or keys %$ConfigR < 1);
   foreach my $Key (keys %Override) {
@@ -138,12 +143,32 @@ sub InitDB {
 ### OUT: DBHandle
   my ($ConfigR,$Die) = @_;
   my %Conf = %$ConfigR;
-  my $DBHandle = DBI->connect(sprintf('DBI:%s:database=%s;host=%s',$Conf{'DBDriver'},$Conf{'DBDatabase'},$Conf{'DBHost'}), $Conf{'DBUser'}, $Conf{'DBPw'}, { PrintError => 0 });
+  my $DBHandle = DBI->connect(sprintf('DBI:%s:database=%s;host=%s',
+                                      $Conf{'DBDriver'},$Conf{'DBDatabase'},
+                                      $Conf{'DBHost'}), $Conf{'DBUser'},
+                                      $Conf{'DBPw'}, { PrintError => 0 });
   if (!$DBHandle) {
-    die ("$MySelf: E: $DBI::errstr\n") if (defined($Die) and $Die);
-    warn("$MySelf: W: $DBI::errstr\n");
+    &Bleat(2,$DBI::errstr) if (defined($Die) and $Die);
+    &Bleat(1,$DBI::errstr);
   };
   return $DBHandle;
+};
+################################################################################
+
+################################################################################
+sub Bleat {
+################################################################################
+### print warning or error messages and terminate in case of error
+### IN : $Level  : 1 = warning, 2 = error
+###      $Message: warning or error message
+  my ($Level,$Message) = @_;
+  if ($Level == 1) {
+    warn "$0 W: $Message\n"
+  } elsif ($Level == 2) {
+    die "$0 E: $Message\n"
+  } else {
+    print "$0: $Message\n"
+  }
 };
 ################################################################################
 
@@ -216,10 +241,11 @@ sub ReadGroupList {
 ### OUT: \%ValidGroups: hash containing all valid newsgroups
   my ($Filename) = @_;
   my %ValidGroups;
-  open (my $LIST,"<$Filename") or die "$MySelf: E: Cannot read $Filename: $!\n";
+  open (my $LIST,"<$Filename") or &Bleat(2,"Cannot read $Filename: $!");
   while (<$LIST>) {
-    s/^(\S+).*$/$1/;
+    s/^\s*(\S+).*$/$1/;
     chomp;
+    next if /^$/;
     $ValidGroups{$_} = '1';
   };
   close $LIST;
@@ -233,29 +259,42 @@ sub ReadGroupList {
 ################################################################################
 sub GetTimePeriod {
 ################################################################################
-### get a time period to act on, in order of preference: by default the
-### last month; or a month submitted by -m YYYY-MM; or a time period submitted
-### by -p YYYY-MM:YYYY-MM
-### IN : $Month,$Period: contents of -m and -p
-### OUT: $StartMonth, $EndMonth (identical if period is just one month)
-  my ($Month,$Period) = @_;
-  # exit if -m is set and not like YYYY-MM
-  die "$MySelf: E: Wrong date format - use '$MySelf -m YYYY-MM'!\n" if not &CheckMonth($Month);
-  # warn if -m and -p is set
-  warn "$MySelf: W: Time period assigned by '-p' takes precendece over month assigned by '-m'.\n" if ($Month && $Period);
-  # default: set -m to last month
-  $Month = &LastMonth if (!defined($Month) and !defined($Period));
-  # set $StartMonth, $EndMonth
-  my ($StartMonth, $EndMonth);
-  if ($Period) {
-    # -p: get date range
-    ($StartMonth, $EndMonth) = &SplitPeriod($Period);
-    die "$MySelf: E: Wrong format for time period - use '$MySelf -p YYYY-MM:YYYY-MM'!\n" if !defined($StartMonth);
+### get a time period to act on from --month option;
+### if empty, default to last month
+### IN : $Month: may be empty, 'YYYY-MM', 'YYYY-MM:YYYY-MM' or 'all'
+### OUT: $Verbal,$SQL: verbal description and WHERE-clause
+###                    of the chosen time period
+  my ($Month) = @_;
+  # define result variables
+  my ($Verbal, $SQL);
+  # define a regular expression for a month
+  my $REMonth = '\d{4}-\d{2}';
+  
+  # default to last month if option is not set
+  if(!$Month) {
+    $Month = &LastMonth;
+  }
+  
+  # check for valid input
+  if ($Month =~ /^$REMonth$/) {
+    # single month (YYYY-MM)
+    ($Month) = &CheckMonth($Month);
+    $Verbal  = $Month;
+    $SQL     = sprintf("month = '%s'",$Month);
+  } elsif ($Month =~ /^$REMonth:$REMonth$/) {
+    # time period (YYYY-MM:YYYY-MM)
+    $Verbal = sprintf('%s to %s',&SplitPeriod($Month));
+    $SQL    = sprintf("month BETWEEN '%s' AND '%s'",&SplitPeriod($Month));
+  } elsif ($Month =~ /^all$/i) {
+    # special case: ALL
+    $Verbal = 'all time';
+    $SQL    = '';
   } else {
-    # set $StartMonth = $EndMonth = $Month if -p is not set
-    $StartMonth = $EndMonth = $Month;
-  };
-  return ($StartMonth, $EndMonth);
+    # invalid input
+    return (undef,undef);
+  }
+  
+  return ($Verbal,$SQL);
 };
 
 ################################################################################
@@ -278,12 +317,23 @@ sub LastMonth {
 ################################################################################
 sub CheckMonth {
 ################################################################################
-### check if input is a valid month in YYYY-MM form
-### IN : $Month: month
-### OUT: TRUE / FALSE
-  my ($Month) = @_;
-  return 0 if (defined($Month) and $Month !~ /^\d{4}-\d{2}$/);
-  return 1;
+### check if input (in YYYY-MM form) is valid with MM between 01 and 12;
+### otherwise, fix it
+### IN : @Month: array of month
+### OUT: @Month: a valid month
+  my (@Month) = @_;
+  foreach my $Month (@Month) {
+    my ($OldMonth) = $Month;
+    my ($CalMonth) = substr ($Month, -2);
+    if ($CalMonth < 1 or $CalMonth > 12) {
+      $CalMonth = '12' if $CalMonth > 12;
+      $CalMonth = '01' if $CalMonth < 1;
+      substr($Month, -2) = $CalMonth;
+      &Bleat(1,sprintf("'%s' is an invalid date (MM must be between '01' ".
+                       "and '12'), set to '%s'.",$OldMonth,$Month));
+    }
+  }
+  return @Month;
 };
 
 ################################################################################
@@ -291,10 +341,10 @@ sub SplitPeriod {
 ################################################################################
 ### split a time period denoted by YYYY-MM:YYYY-MM into start and end month
 ### IN : $Period: time period
-### OUT: $StartMonth, Â$EndMonth
+### OUT: $StartMonth, $EndMonth
   my ($Period) = @_;
-  return (undef,undef) if $Period !~ /^\d{4}-\d{2}:\d{4}-\d{2}$/;
   my ($StartMonth, $EndMonth) = split /:/, $Period;
+  ($StartMonth,$EndMonth) = CheckMonth($StartMonth,$EndMonth);
   # switch parameters as necessary
   if ($EndMonth gt $StartMonth) {
     return ($StartMonth, $EndMonth);
@@ -307,12 +357,13 @@ sub SplitPeriod {
 sub ListMonth {
 ################################################################################
 ### return a list of months (YYYY-MM) between start and end month
-### IN : $StartMonth, $EndMonth
-### OUT: @Months: array containing all months from $StartMonth to $EndMonth
-  my ($StartMonth, $EndMonth) = @_;
-  return (undef,undef) if ($StartMonth !~ /^\d{4}-\d{2}$/ or $EndMonth !~ /^\d{4}-\d{2}$/);
-  # return if $StartMonth = $EndMonth
-  return ($StartMonth) if ($StartMonth eq $EndMonth);
+### IN : $MonthExpression ('YYYY-MM' or 'YYYY-MM to YYYY-MM')
+### OUT: @Months: array containing all months from $MonthExpression enumerated
+  my ($MonthExpression )= @_;
+  # return if single month
+  return ($MonthExpression) if ($MonthExpression =~ /^\d{4}-\d{2}$/);
+  # parse $MonthExpression
+  my ($StartMonth, $EndMonth) = split(' to ',$MonthExpression);
   # set $Year, $Month from $StartMonth
   my ($Year, $Month) = split /-/, $StartMonth;
   # define @Months
@@ -335,64 +386,104 @@ sub ListMonth {
 sub OutputData {
 ################################################################################
 ### read database query results from DBHandle and print results with formatting
-### IN : $Format  : format specifier
-###      $FileName: file name template (-f): filename-YYYY-MM
-###      $DBQuery : database query handle with executed query,
+### IN : $Format   : format specifier
+###      $Comments : print or suppress all comments for machine-readable output
+###      $GroupBy  : primary sorting order (month or key)
+###      $Precision: number of digits right of decimal point (0 or 2)
+###      $ValidKeys: reference to a hash containing all valid keys
+###      $FileTempl: file name template (--filetemplate): filetempl-YYYY-MM
+###      $DBQuery  : database query handle with executed query,
 ###                 containing $Month, $Key, $Value
-###      $PadGroup: padding length for newsgroups field (optional) for 'pretty'
-  my ($Format, $FileName, $DBQuery, $PadGroup) = @_;
-  my ($Handle, $OUT);
+###      $PadField : padding length for key field (optional) for 'pretty'
+###      $PadValue : padding length for value field (optional) for 'pretty'
+  my ($Format, $Comments, $GroupBy, $Precision, $ValidKeys, $FileTempl,
+      $DBQuery, $PadField, $PadValue) = @_;
+  my %ValidKeys = %{$ValidKeys} if $ValidKeys;
+  my ($FileName, $Handle, $OUT);
   our $LastIteration;
+  
+  # define output types
+  my %LegalOutput;
+  @LegalOutput{('dump','list','pretty')} = ();
+  # bail out if format is unknown
+  &Bleat(2,"Unknown output type '$Format'!") if !exists($LegalOutput{$Format});
+
   while (my ($Month, $Key, $Value) = $DBQuery->fetchrow_array) {
+    # don't display invalid keys
+    if(%ValidKeys and !defined($ValidKeys{$Key})) {
+      # FIXME
+      # &Bleat(1,sprintf("DROPPED: %s",$Key));
+      next;
+    };
+    # care for correct sorting order and abstract from month and keys:
+    # $Caption will be $Month or $Key, according to sorting order,
+    # and $Key will be $Key or $Month, respectively
+    my $Caption;
+    if ($GroupBy eq 'key') {
+      $Caption = $Key;
+      $Key     = $Month;
+    } else {
+      $Caption = $Month;
+    }
     # set output file handle
-    if (!$FileName) {
+    if (!$FileTempl) {
       $Handle = *STDOUT{IO}; # set $Handle to a reference to STDOUT
-    } elsif (!defined($LastIteration) or $LastIteration ne $Month) {
+    } elsif (!defined($LastIteration) or $LastIteration ne $Caption) {
       close $OUT if ($LastIteration);
-      open ($OUT,sprintf('>%s-%s',$FileName,$Month)) or die sprintf("$MySelf: E: Cannot open output file '%s-%s': $!\n",$FileName,$Month);
+      # safeguards for filename creation:
+      # replace potential problem characters with '_'
+      $FileName = sprintf('%s-%s',$FileTempl,$Caption);
+      $FileName =~ s/[^a-zA-Z0-9_-]+/_/g; 
+      open ($OUT,">$FileName")
+        or &Bleat(2,sprintf("Cannot open output file '%s': $!",
+                            $FileName));
       $Handle = $OUT;
     };
-    print $Handle &FormatOutput($Format, $Month, $Key, $Value, $PadGroup);
-    $LastIteration = $Month;
+    print $Handle &FormatOutput($Format, $Comments, $Caption, $Key, $Value,
+                                $Precision, $PadField, $PadValue);
+    $LastIteration = $Caption;
   };
-  close $OUT if ($FileName);
+  close $OUT if ($FileTempl);
 };
 
 ################################################################################
 sub FormatOutput {
 ################################################################################
 ### format information for output according to format specifier
-### IN : $Format  : format specifier
-###      $Month   : month (as YYYY-MM)
-###      $Key     : newsgroup, client, ...
-###      $Value   : number of postings with that attribute
-###      $PadGroup: padding length for key field (optional) for 'pretty'
+### IN : $Format   : format specifier
+###      $Comments : print or suppress all comments for machine-readable output
+###      $Caption  : month (as YYYY-MM) or $Key, according to sorting order
+###      $Key      : newsgroup, client, ... or $Month, as above
+###      $Value    : number of postings with that attribute
+###      $Precision: number of digits right of decimal point (0 or 2)
+###      $PadField : padding length for key field (optional) for 'pretty'
+###      $PadValue : padding length for value field (optional) for 'pretty'
 ### OUT: $Output: formatted output
-  my ($Format, $Month, $Key, $Value, $PadGroup) = @_;
-
-  # define output types
-  my %LegalOutput;
-  @LegalOutput{('dump','dumpgroup','list','pretty')} = ();
-  # bail out if format is unknown
-  die "$MySelf: E: Unknown output type '$Format'!\n" if !exists($LegalOutput{$Format});
-
+  my ($Format, $Comments, $Caption, $Key, $Value, $Precision, $PadField,
+      $PadValue) = @_;
   my ($Output);
-  # keep last month in mind
+  # keep last caption in mind
   our ($LastIteration);
+  # create one line of output
   if ($Format eq 'dump') {
-    # output as dump (ng nnnnn)
-    $Output = sprintf ("%s %u\n",$Key,$Value);
-  } elsif ($Format eq 'dumpgroup') {
-    # output as dump (YYYY-NN: nnnnn)
-    $Output = sprintf ("%s: %5u\n",$Month,$Value);
+    # output as dump (key value)
+    $Output = sprintf ("# %s:\n",$Caption)
+      if ($Comments and (!defined($LastIteration) or $Caption ne $LastIteration));
+    $Output .= sprintf ("%s %u\n",$Key,$Value);
   } elsif ($Format eq 'list') {
-    # output as list (YYYY-NN: ng nnnnn)
-    $Output = sprintf ("%s: %s %u\n",$Month,$Key,$Value);
+    # output as list (caption key value)
+    $Output = sprintf ("%s %s %u\n",$Caption,$Key,$Value);
   } elsif ($Format eq 'pretty') {
-    # output as table
-    $Output = sprintf ("----- %s:\n",$Month) if (!defined($LastIteration) or $Month ne $LastIteration);
-    $LastIteration = $Month;
-    $Output .= sprintf ($PadGroup ? sprintf("%%-%us %%5u\n",$PadGroup) : "%s %u\n",$Key,$Value);
+    # output as a table
+    $Output = sprintf ("# ----- %s:\n",$Caption)
+      if ($Comments and (!defined($LastIteration) or $Caption ne $LastIteration));
+    # increase $PadValue for numbers with decimal point
+    $PadValue += $Precision+1 if $Precision;
+    # add padding if $PadField is set; $PadValue HAS to be set then
+    $Output .= sprintf ($PadField ?
+                        sprintf("%%-%us%%s %%%u.*f\n",$PadField,$PadValue) :
+                        "%s%s %.*f\n",$Key,$Comments ? ':' : '',
+                        $Precision,$Value);
   };
   return $Output;
 };
@@ -408,45 +499,274 @@ sub SQLHierarchies {
 ### IN : $ShowHierarchies: boolean value
 ### OUT: SQL code
   my ($ShowHierarchies) = @_;
-  return $ShowHierarchies ? '' : "AND newsgroup NOT LIKE '%.ALL'";
+  return $ShowHierarchies ? '' : "newsgroup NOT LIKE '%.ALL'";
 };
 
 ################################################################################
 sub GetMaxLength {
 ################################################################################
-### get length of longest field in future query result
-### IN : $DBHandle   : database handel
-###      $Table      : table to query
-###      $Field      : field to check
-###      $WhereClause: WHERE clause
-###      @BindVars   : bind variables for WHERE clause
-### OUT: $Length: length of longest instnace of $Field
-  my ($DBHandle,$Table,$Field,$WhereClause,@BindVars) = @_;
-  my $DBQuery = $DBHandle->prepare(sprintf("SELECT MAX(LENGTH(%s)) FROM %s WHERE %s",$Field,$Table,$WhereClause));
-  $DBQuery->execute(@BindVars) or warn sprintf("$MySelf: W: Can't get field length for %s from table %s: $DBI::errstr\n",$Field,$Table);
-  my ($Length) = $DBQuery->fetchrow_array;
-  return $Length;
+### get length of longest fields in future query result
+### IN : $DBHandle    : database handle
+###      $Table       : table to query
+###      $Field       : field (key!, i.e. month, newsgroup, ...) to check
+###      $Value       : field (value!, i.e. postings) to check
+###      $WhereClause : WHERE clause
+###      $HavingClause: HAVING clause
+###      @BindVars    : bind variables for WHERE clause
+### OUT: $FieldLength : length of longest instance of $Field
+###      $ValueLength : length of longest instance of $Value
+  my ($DBHandle,$Table,$Field,$Value,$WhereClause,$HavingClause,@BindVars) = @_;
+  my $DBQuery = $DBHandle->prepare(sprintf("SELECT MAX(LENGTH(%s)),".
+                                           "MAX(%s) ".
+                                           "FROM %s %s %s",$Field,,$Value,
+                                           $Table,$WhereClause,$HavingClause ?
+                                           'GROUP BY newsgroup' . $HavingClause .
+                                           ' ORDER BY LENGTH(newsgroup) '.
+                                           'DESC LIMIT 1': ''));
+  $DBQuery->execute(@BindVars) or &Bleat(1,sprintf("Can't get field length ".
+                                                   "for '%s' from table '%s': ".
+                                                   "$DBI::errstr",$Field,$Table));
+  my ($FieldLength,$ValueMax) = $DBQuery->fetchrow_array;
+  my $ValueLength = length($ValueMax) if ($ValueMax);
+  return ($FieldLength,$ValueLength);
+};
+
+################################################################################
+sub SQLSortOrder {
+################################################################################
+### build a SQL 'ORDER BY' clause from $OptGroupBy (primary sorting) and
+### $OptOrderBy (secondary sorting), both ascending or descending;
+### descending sorting order is done by adding '-desc'
+### IN : $GroupBy: primary sort by 'month' (default) or 'newsgroups'
+###      $OrderBy: secondary sort by month/newsgroups (default)
+###                or number of 'postings'
+### OUT: a SQL ORDER BY clause
+  my ($GroupBy,$OrderBy) = @_;
+  my ($GroupSort,$OrderSort) = ('','');
+  # $GroupBy (primary sorting)
+  if (!$GroupBy) {
+    $GroupBy   = 'month';
+  } else {
+    ($GroupBy, $GroupSort) = SQLParseOrder($GroupBy);
+    if ($GroupBy =~ /group/i) {
+      $GroupBy   = 'newsgroup';
+    } else {
+      $GroupBy   = 'month';
+    }
+  }
+  my $Secondary = ($GroupBy eq 'month') ? 'newsgroup' : 'month';
+  # $OrderBy (secondary sorting)
+  if (!$OrderBy) {
+    $OrderBy = $Secondary;
+  } else {
+    ($OrderBy, $OrderSort) = SQLParseOrder($OrderBy);
+    if ($OrderBy =~ /posting/i) {
+      $OrderBy = "postings $OrderSort, $Secondary";
+    } else {
+      $OrderBy = "$Secondary $OrderSort";
+    }
+  }
+  return ($GroupBy,&SQLBuildClause('order',"$GroupBy $GroupSort",$OrderBy));
+};
+
+################################################################################
+sub SQLParseOrder {
+################################################################################
+### parse $OptGroupBy or $OptOrderBy option of the form param[-desc], e.g.
+### 'month', 'month-desc', 'newsgroups-desc', but also just 'desc'
+### IN : $OrderOption: order option (see above)
+### OUT: parameter to sort by,
+###      sort order ('DESC' or nothing, meaning 'ASC')
+  my ($OrderOption) = @_;
+  my $SortOrder = '';
+  if ($OrderOption =~ s/-?desc$//i) {
+    $SortOrder = 'DESC';
+  } else {
+    $OrderOption =~ s/-?asc$//i
+  }
+  return ($OrderOption,$SortOrder);
 };
 
 ################################################################################
 sub SQLGroupList {
 ################################################################################
-### explode list of newsgroups separated by : (with wildcards) to a SQL WHERE
-### clause
+### explode list of newsgroups separated by : (with wildcards)
+### to a SQL 'WHERE' expression
 ### IN : $Newsgroups: list of newsgroups (group.one.*:group.two:group.three.*)
-### OUT: SQL code, list of newsgroups
+### OUT: SQL code to become part of a 'WHERE' clause,
+###      list of newsgroups for SQL bindings
   my ($Newsgroups) = @_;
+  # substitute '*' wildcard with SQL wildcard character '%'
   $Newsgroups =~ s/\*/%/g;
-  return ('newsgroup LIKE ?', $Newsgroups) if $Newsgroups !~ /:/;
-  my $SQL = '(';
+  return (undef,undef) if !CheckValidNewsgroups($Newsgroups);
+  # just one newsgroup?
+  return (SQLGroupWildcard($Newsgroups),$Newsgroups) if $Newsgroups !~ /:/;
+  my ($SQL,@WildcardGroups,@NoWildcardGroups);
+  # list of newsgroups separated by ':'
   my @GroupList = split /:/, $Newsgroups;
   foreach (@GroupList) {
-     $SQL .= ' OR ' if $SQL gt '(';
-     $SQL .= 'newsgroup LIKE ?';
+    if ($_ !~ /%/) {
+      # add to list of newsgroup names WITHOUT wildcard
+      push (@NoWildcardGroups,$_);
+    } else {
+      # add to list of newsgroup names WITH wildcard
+      push (@WildcardGroups,$_);
+      # add wildcard to SQL clause
+      # 'OR' if SQL clause is not empty
+      $SQL .= ' OR ' if $SQL;
+      $SQL .= 'newsgroup LIKE ?'
+    }
   };
-  $SQL .= ')';
+  if (scalar(@NoWildcardGroups)) {
+    # add 'OR' if SQL clause is not empty
+    $SQL .= ' OR ' if $SQL;
+    if (scalar(@NoWildcardGroups) < 2) {
+      # special case: just one newsgroup without wildcard
+      $SQL .= 'newsgroup = ?';
+    } else {
+      # create list of newsgroups to include: 'newsgroup IN (...)'
+      $SQL .= 'newsgroup IN (';
+      my $SQLin;
+      foreach (@NoWildcardGroups) {
+        $SQLin .= ',' if $SQLin;
+        $SQLin .= '?';
+      }
+      # add list to SQL clause
+      $SQL .= $SQLin .= ')';
+    }
+  }
+  # add brackets '()' to SQL clause as needed (more than one wildcard group)
+  if (scalar(@WildcardGroups)) {
+    $SQL = '(' . $SQL .')';
+  }
+  # rebuild @GroupList in (now) correct order
+  @GroupList = (@WildcardGroups,@NoWildcardGroups);
   return ($SQL,@GroupList);
 };
+
+################################################################################
+sub SQLGroupWildcard {
+################################################################################
+### build a valid SQL 'WHERE' expression with or without wildcards
+### IN : $Newsgroup: newsgroup expression, probably with wildcard
+###                  (group.name or group.name.%)
+### OUT: SQL code to become part of a 'WHERE' clause
+  my ($Newsgroup) = @_;
+  if ($Newsgroup !~ /%/) {
+    return 'newsgroup = ?';
+  } else {
+    return 'newsgroup LIKE ?';
+  }
+};
+
+################################################################################
+sub SQLSetBounds {
+################################################################################
+### set upper and/or lower boundary (number of postings)
+### IN : $Type: 'level', 'average', 'sum' or 'default'
+###      $LowBound,$UppBound: lower/upper boundary, respectively
+### OUT: SQL code to become part of a WHERE or HAVING clause
+  my ($Type,$LowBound,$UppBound) = @_;
+  ($LowBound,$UppBound) = SQLCheckNumber($LowBound,$UppBound);
+  if($LowBound and $UppBound and $LowBound > $UppBound) {
+    &Bleat(1,"Lower boundary $LowBound is larger than Upper boundary ".
+             "$UppBound, exchanging boundaries.");
+    ($LowBound,$UppBound) = ($UppBound,$LowBound);
+  }
+  # default to 'default'
+  my $WhereHavingFunction = 'postings';
+  # set $LowBound to SQL statement:
+  # 'WHERE postings >=', 'HAVING MIN(postings) >=' or 'HAVING AVG(postings) >='
+  if ($Type eq 'level') {
+    $WhereHavingFunction = 'MIN(postings)'
+  } elsif ($Type eq 'average') {
+    $WhereHavingFunction = 'AVG(postings)'
+  } elsif ($Type eq 'sum') {
+    $WhereHavingFunction = 'SUM(postings)'
+  }
+  $LowBound = sprintf('%s >= '.$LowBound,$WhereHavingFunction) if ($LowBound);
+  # set $LowBound to SQL statement:
+  # 'WHERE postings <=', 'HAVING MAX(postings) <=' or 'HAVING AVG(postings) <='
+  if ($Type eq 'level') {
+    $WhereHavingFunction = 'MAX(postings)'
+  } elsif ($Type eq 'average') {
+    $WhereHavingFunction = 'AVG(postings)'
+  } elsif ($Type eq 'sum') {
+    $WhereHavingFunction = 'SUM(postings)'
+  }
+  $UppBound = sprintf('%s <= '.$UppBound,$WhereHavingFunction) if ($UppBound);
+  return ($LowBound,$UppBound);
+};
+
+################################################################################
+sub SQLCheckNumber {
+################################################################################
+### check if input is a valid positive integer; otherwise, make it one
+### IN : @Numbers: array of parameters
+### OUT: @Numbers: a valid positive integer
+  my (@Numbers) = @_;
+  foreach my $Number (@Numbers) {
+    if ($Number and $Number < 0) {
+      &Bleat(1,"Boundary $Number is < 0, set to ".-$Number);
+      $Number = -$Number;
+    }
+    $Number = '' if ($Number and $Number !~ /^\d+$/);
+  }
+  return @Numbers;
+};
+
+################################################################################
+sub SQLBuildClause {
+################################################################################
+### build a valid SQL WHERE, GROUP BY, ORDER BY or HAVING clause
+### from multiple expressions which *may* be empty
+### IN : $Type: 'where', 'having', 'group' or 'order'
+###      @Expressions: array of expressions
+### OUT: $SQLClause: a SQL clause
+  my ($Type,@Expressions) = @_;
+  my ($SQLClause,$Separator,$Statement);
+  # set separator ('AND' or ',')
+  if ($Type eq 'where' or $Type eq 'having') {
+    $Separator = 'AND';
+  } else {
+    $Separator = ',';
+  }
+  # set statement
+  if ($Type eq 'where') {
+    $Statement = 'WHERE';
+  } elsif ($Type eq 'order') {
+    $Statement = 'ORDER BY';
+  } elsif ($Type eq 'having') {
+    $Statement = 'HAVING';
+  } else {
+    $Statement = 'GROUP BY';
+  }
+  # build query from expressions with separators
+  foreach my $Expression (@Expressions) {
+    if ($Expression) {
+      $SQLClause .= " $Separator " if ($SQLClause);
+      $SQLClause .= $Expression;
+    }
+  }
+  # add statement in front if not already present
+  $SQLClause = " $Statement " . $SQLClause
+    if ($SQLClause and $SQLClause !~ /$Statement/);
+  return $SQLClause;
+};
+
+#####--------------------------- Verifications ----------------------------#####
+
+################################################################################
+sub CheckValidNewsgroups {
+################################################################################
+### syntax check of newgroup list
+### IN : $Newsgroups: list of newsgroups (group.one.*:group.two:group.three.*)
+### OUT: boolean
+  my ($Newsgroups) = @_;
+  my $InvalidCharRegExp = ',; ';
+  return ($Newsgroups =~ /[$InvalidCharRegExp]/) ? 0 : 1;
+};
+
 
 #####------------------------------- done ---------------------------------#####
 1;

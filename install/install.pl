@@ -1,4 +1,4 @@
-#! /usr/bin/perl -W
+#! /usr/bin/perl
 #
 # install.pl
 #
@@ -6,7 +6,7 @@
 # 
 # It is part of the NewsStats package.
 #
-# Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+# Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 #
 # It can be redistributed and/or modified under the same terms under 
 # which Perl itself is published.
@@ -18,29 +18,39 @@ BEGIN {
   push(@INC, dirname($0).'/..');
 }
 use strict;
+use warnings;
 
 use NewsStats qw(:DEFAULT);
 
 use Cwd;
 
 use DBI;
+use Getopt::Long qw(GetOptions);
+Getopt::Long::config ('bundling');
 
 ################################# Main program #################################
 
 ### read commandline options
-my %Options = &ReadOptions('u:');
+my ($OptUpdate);
+GetOptions ('u|update=s' => \$OptUpdate,
+            'h|help'     => \&ShowPOD,
+            'V|version'  => \&ShowVersion) or exit 1;
 
 ### change working directory to .. (as we're in .../install)
-chdir dirname($0).'/..';
+chdir dirname($FullPath).'/..';
 my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
-my %Conf = %{ReadConfig('newsstats.conf')};
+my %Conf = %{ReadConfig($Path.'/newsstats.conf')};
 
 ##### --------------------------------------------------------------------------
 ##### Database table definitions
 ##### --------------------------------------------------------------------------
+
+my $DBCreate = <<SQLDB;
+CREATE DATABASE IF NOT EXISTS `$Conf{'DBDatabase'}` DEFAULT CHARSET=utf8;
+SQLDB
 
 my %DBCreate = ('DBTableRaw'  => <<RAW, 'DBTableGrps' => <<GRPS);
 -- 
@@ -129,9 +139,11 @@ Enjoy!
 -thh <thh\@inter.net>
 INSTALL
 
-my $Upgrade = <<UPGRADE;
+my $Upgrade ='';
+if ($OptUpdate) {
+ $Upgrade = <<UPGRADE;
 ----------
-Your installation was upgraded from $Options{'u'} to $PackageVersion.
+Your installation was upgraded from $OptUpdate to $PackageVersion.
 
 Don't forget to restart your INN feed so that it can pick up the new version:
 
@@ -139,17 +151,35 @@ Don't forget to restart your INN feed so that it can pick up the new version:
 
 (or whatever you called your feed).
 UPGRADE
+}
 
 ##### --------------------------- End of definitions ---------------------------
+
+### create DB, if necessary
+if (!$OptUpdate) {
+  print "----------\nStarting database creation.\n";
+  # create database
+  # we can't use InitDB() as that will use a table name of
+  # the table that doesn't exist yet ...
+  my $DBHandle = DBI->connect(sprintf('DBI:%s:host=%s',$Conf{'DBDriver'},
+                                      $Conf{'DBHost'}), $Conf{'DBUser'},
+                                      $Conf{'DBPw'}, { PrintError => 0 });
+  my $DBQuery = $DBHandle->prepare($DBCreate);
+  $DBQuery->execute() or &Bleat(2, sprintf("Can't create database %s: %s%\n",
+                                           $Conf{'DBDatabase'}, $DBI::errstr));
+  
+  printf("Database table %s created succesfully.\n",$Conf{'DBDatabase'});
+  $DBHandle->disconnect;
+};
 
 ### DB init, read list of tables
 print "Reading database information.\n";
 my $DBHandle = InitDB(\%Conf,1);
-my %TablesInDB = %{$DBHandle->table_info('%', '%', '%', 'TABLE')->fetchall_hashref('TABLE_NAME')};
+my %TablesInDB =
+   %{$DBHandle->table_info('%', '%', '%', 'TABLE')->fetchall_hashref('TABLE_NAME')};
 
-if (!$Options{'u'}) {
+if (!$OptUpdate) {
   ##### installation mode
-  print "----------\nStarting database table generation.\n";
   # check for tables and create them, if they don't exist yet
   foreach my $Table (keys %DBCreate) {
     &CreateTable($Table);
@@ -162,8 +192,8 @@ if (!$Options{'u'}) {
   ##### upgrade mode
   print "----------\nStarting upgrade process.\n";
   $PackageVersion = '0.03';
-  if ($Options{'u'} < $PackageVersion) {
-    if ($Options{'u'} < 0.02) {
+  if ($OptUpdate < $PackageVersion) {
+    if ($OptUpdate < 0.02) {
       # 0.01 -> 0.02
       # &DoMySQL('...;');
       # print "v0.02: Database upgrades ...\n";
@@ -185,19 +215,23 @@ exit(0);
 sub CreateTable {
   my $Table = shift;
   if (defined($TablesInDB{$Conf{$Table}})) {
-    printf("Database table %s.%s already exists, skipping ....\n",$Conf{'DBDatabase'},$Conf{$Table});
+    printf("Database table %s.%s already exists, skipping ....\n",
+           $Conf{'DBDatabase'},$Conf{$Table});
     return;
   };
   my $DBQuery = $DBHandle->prepare($DBCreate{$Table});
-  $DBQuery->execute() or die sprintf("$MySelf: E: Can't create table %s in database %s: %s%\n",$Table,$Conf{'DBDatabase'},$DBI::errstr);
-  printf("Database table %s.%s created succesfully.\n",$Conf{'DBDatabase'},$Conf{$Table});
+  $DBQuery->execute() or
+    &Bleat(2, sprintf("Can't create table %s in database %s: %s%\n",$Table,
+                      $Conf{'DBDatabase'},$DBI::errstr));
+  printf("Database table %s.%s created succesfully.\n",
+         $Conf{'DBDatabase'},$Conf{$Table});
   return;
 };
 
 sub DoMySQL {
   my $SQL = shift;
   my $DBQuery = $DBHandle->prepare($SQL);
-  $DBQuery->execute() or warn sprintf("$MySelf: E: Database error: %s\n",$DBI::errstr);
+  $DBQuery->execute() or &Bleat(1, sprintf("Database error: %s\n",$DBI::errstr));
   return;
 };
 
@@ -221,23 +255,11 @@ install - installation script
 
 =head1 SYNOPSIS
 
-B<install> [B<-Vh>]
+B<install> [B<-Vh> [--update I<version>]
 
 =head1 REQUIREMENTS
 
-See doc/README: Perl 5.8.x itself and the following modules from CPAN:
-
-=over 2
-
-=item -
-
-Config::Auto
-
-=item -
-
-DBI
-
-=back
+See L<doc/README>.
 
 =head1 DESCRIPTION
 
@@ -245,22 +267,26 @@ This script will create database tables as necessary and configured.
 
 =head2 Configuration
 
-F<install.pl> will read its configuration from F<newsstats.conf> via
+B<install> will read its configuration from F<newsstats.conf> via
 Config::Auto.
 
-See doc/INSTALL for an overview of possible configuration options.
+See L<doc/INSTALL> for an overview of possible configuration options.
 
 =head1 OPTIONS
 
 =over 3
 
-=item B<-V> (version)
+=item B<-V>, B<--version>
 
-Print out version and copyright information on B<yapfaq> and exit.
+Print out version and copyright information and exit.
 
-=item B<-h> (help)
+=item B<-h>, B<--help>
 
 Print this man page and exit.
+
+=item B<-u>, B<--update> I<version>
+
+Don't do a fresh install, but update from I<version>.
 
 =back
 
@@ -278,7 +304,7 @@ Library functions for the NewsStats package.
 
 =item F<newsstats.conf>
 
-Runtime configuration file for B<yapfaq>.
+Runtime configuration file.
 
 =back
 
@@ -293,11 +319,11 @@ bug tracker at L<http://bugs.th-h.de/>!
 
 =item -
 
-doc/README
+L<doc/README>
 
 =item -
 
-doc/INSTALL
+L<doc/INSTALL>
 
 =back
 
@@ -309,7 +335,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.
