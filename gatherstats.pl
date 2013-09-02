@@ -19,7 +19,7 @@ BEGIN {
 }
 use strict;
 
-use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups ReadGroupList);
+use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups ParseHierarchies ReadGroupList);
 
 use DBI;
 use Getopt::Long qw(GetOptions);
@@ -145,13 +145,15 @@ foreach my $Month (&ListMonth($Period)) {
     if (%ValidGroups) {
       foreach (sort keys %ValidGroups) {
         if (!defined($Postings{$_})) {
-          # expand newsgroup with hierarchies
-          my @Newsgroups = ParseHierarchies($_);
-          # add each empty newsgroup and empty hierarchies, too, as needed
-          foreach (@Newsgroups) {
-            if (!defined($Postings{$_})) {
-              $Postings{$_} = 0;
-              warn (sprintf("ADDED: %s as empty group\n",$_));
+          # add current newsgroup as empty group
+          $Postings{$_} = 0;
+          warn (sprintf("ADDED: %s as empty group\n",$_));
+          # add empty hierarchies for current newsgroup as needed
+          foreach (ParseHierarchies($_)) {
+            my $Hierarchy = $_ . '.ALL';
+            if (!defined($Postings{$Hierarchy})) {
+              $Postings{$Hierarchy} = 0;
+              warn (sprintf("ADDED: %s as empty group\n",$Hierarchy));
             };
           };
         }
