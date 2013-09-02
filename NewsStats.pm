@@ -577,14 +577,46 @@ sub SQLGroupList {
   return (undef,undef) if !CheckValidNewsgroups($Newsgroups);
   # just one newsgroup?
   return (SQLGroupWildcard($Newsgroups),$Newsgroups) if $Newsgroups !~ /:/;
+  my ($SQL,@WildcardGroups,@NoWildcardGroups);
   # list of newsgroups separated by ':'
-  my $SQL = '(';
   my @GroupList = split /:/, $Newsgroups;
   foreach (@GroupList) {
-     $SQL .= ' OR ' if $SQL gt '(';
-     $SQL .= SQLGroupWildcard($_);
+    if ($_ !~ /%/) {
+      # add to list of newsgroup names WITHOUT wildcard
+      push (@NoWildcardGroups,$_);
+    } else {
+      # add to list of newsgroup names WITH wildcard
+      push (@WildcardGroups,$_);
+      # add wildcard to SQL clause
+      # 'OR' if SQL clause is not empty
+      $SQL .= ' OR ' if $SQL;
+      $SQL .= 'newsgroup LIKE ?'
+    }
   };
-  $SQL .= ')';
+  if (scalar(@NoWildcardGroups)) {
+    # add 'OR' if SQL clause is not empty
+    $SQL .= ' OR ' if $SQL;
+    if (scalar(@NoWildcardGroups) < 2) {
+      # special case: just one newsgroup without wildcard
+      $SQL .= 'newsgroup = ?';
+    } else {
+      # create list of newsgroups to include: 'newsgroup IN (...)'
+      $SQL .= 'newsgroup IN (';
+      my $SQLin;
+      foreach (@NoWildcardGroups) {
+        $SQLin .= ',' if $SQLin;
+        $SQLin .= '?';
+      }
+      # add list to SQL clause
+      $SQL .= $SQLin .= ')';
+    }
+  }
+  # add brackets '()' to SQL clause as needed (more than one wildcard group)
+  if (scalar(@WildcardGroups)) {
+    $SQL = '(' . $SQL .')';
+  }
+  # rebuild @GroupList in (now) correct order
+  @GroupList = (@WildcardGroups,@NoWildcardGroups);
   return ($SQL,@GroupList);
 };
 
