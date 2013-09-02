@@ -36,16 +36,20 @@ GetOptions ('u|update=s' => \$OptUpdate,
             'V|version'  => \&ShowVersion) or exit 1;
 
 ### change working directory to .. (as we're in .../install)
-chdir dirname($0).'/..';
+chdir dirname($FullPath).'/..';
 my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig($Path.'/newsstats.conf')};
 
 ##### --------------------------------------------------------------------------
 ##### Database table definitions
 ##### --------------------------------------------------------------------------
+
+my $DBCreate = <<SQLDB;
+CREATE DATABASE IF NOT EXISTS `$Conf{'DBDatabase'}` DEFAULT CHARSET=utf8;
+SQLDB
 
 my %DBCreate = ('DBTableRaw'  => <<RAW, 'DBTableGrps' => <<GRPS);
 -- 
@@ -134,7 +138,9 @@ Enjoy!
 -thh <thh\@inter.net>
 INSTALL
 
-my $Upgrade = <<UPGRADE;
+my $Upgrade ='';
+if ($OptUpdate) {
+ $Upgrade = <<UPGRADE;
 ----------
 Your installation was upgraded from $OptUpdate to $PackageVersion.
 
@@ -144,8 +150,26 @@ Don't forget to restart your INN feed so that it can pick up the new version:
 
 (or whatever you called your feed).
 UPGRADE
+}
 
 ##### --------------------------- End of definitions ---------------------------
+
+### create DB, if necessary
+if (!$OptUpdate) {
+  print "----------\nStarting database creation.\n";
+  # create database
+  # we can't use InitDB() as that will use a table name of
+  # the table that doesn't exist yet ...
+  my $DBHandle = DBI->connect(sprintf('DBI:%s:host=%s',$Conf{'DBDriver'},
+                                      $Conf{'DBHost'}), $Conf{'DBUser'},
+                                      $Conf{'DBPw'}, { PrintError => 0 });
+  my $DBQuery = $DBHandle->prepare($DBCreate);
+  $DBQuery->execute() or &Bleat(2, sprintf("Can't create database %s: %s%\n",
+                                           $Conf{'DBDatabase'}, $DBI::errstr));
+  
+  printf("Database table %s created succesfully.\n",$Conf{'DBDatabase'});
+  $DBHandle->disconnect;
+};
 
 ### DB init, read list of tables
 print "Reading database information.\n";
@@ -155,7 +179,6 @@ my %TablesInDB =
 
 if (!$OptUpdate) {
   ##### installation mode
-  print "----------\nStarting database table generation.\n";
   # check for tables and create them, if they don't exist yet
   foreach my $Table (keys %DBCreate) {
     &CreateTable($Table);
