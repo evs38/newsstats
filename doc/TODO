@@ -39,14 +39,12 @@ Bug numbers refer to the Mantis issue tracker at <http://bugs.th-h.de/>.
 
 * Individual improvements
   + NewsStats.pm
-    - Add error handling when reading config (Bug #13)
-      NewsStats should check if all mandatory options are set. Some syntax or
-      content related checks would be in order.
+    - Improve error handling when reading config
+      Some syntax or content related checks would be in order.
       Some other tests - working database connection, valid database and table
       names - would be nice.
 
   + install/install.pl
-    - Check installer & fix bugs to get a working version ... finally
     - Read current version from a file dropped and updated by installer
     - Add / enhance / test error handling
     - General tests and optimisations

@@ -2,7 +2,7 @@
 #
 # Library functions for the NewsStats package.
 #
-# Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
+# Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
 # This module can be redistributed and/or modified under the same terms under 
 # which Perl itself is published.
