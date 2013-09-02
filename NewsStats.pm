@@ -574,6 +574,7 @@ sub SQLGroupList {
   my ($Newsgroups) = @_;
   # substitute '*' wildcard with SQL wildcard character '%'
   $Newsgroups =~ s/\*/%/g;
+  return (undef,undef) if !CheckValidNewsgroups($Newsgroups);
   # just one newsgroup?
   return (SQLGroupWildcard($Newsgroups),$Newsgroups) if $Newsgroups !~ /:/;
   # list of newsgroups separated by ':'
@@ -595,7 +596,6 @@ sub SQLGroupWildcard {
 ###                  (group.name or group.name.%)
 ### OUT: SQL code to become part of a 'WHERE' clause
   my ($Newsgroup) = @_;
-  # FIXME: check for validity
   if ($Newsgroup !~ /%/) {
     return 'newsgroup = ?';
   } else {
@@ -696,6 +696,19 @@ sub SQLBuildClause {
   $SQLClause = " $Statement " . $SQLClause
     if ($SQLClause and $SQLClause !~ /$Statement/);
   return $SQLClause;
+};
+
+#####--------------------------- Verifications ----------------------------#####
+
+################################################################################
+sub CheckValidNewsgroups {
+################################################################################
+### syntax check of newgroup list
+### IN : $Newsgroups: list of newsgroups (group.one.*:group.two:group.three.*)
+### OUT: boolean
+  my ($Newsgroups) = @_;
+  my $InvalidCharRegExp = ',; ';
+  return ($Newsgroups =~ /[$InvalidCharRegExp]/) ? 0 : 1;
 };
 
 
