@@ -99,7 +99,19 @@ sub ReadConfig {
 ### IN : $ConfFile: config filename
 ### OUT: reference to a hash containing the configuration
   my ($ConfFile) = @_;
-  return Config::Auto::parse($ConfFile, format => 'equal');
+  # mandatory configuration options
+  my @Mandatory = ('DBDriver','DBHost','DBUser','DBPw','DBDatabase',
+                   'DBTableRaw','DBTableGrps');
+  # read config via Config::Auto
+  my $ConfR = Config::Auto::parse($ConfFile, format => 'equal');
+  my %Conf  = %{$ConfR};
+  # check for mandatory options
+  foreach (@Mandatory) {
+    &Bleat(2,sprintf("Mandatory configuration option %s is not set!",$_))
+      if (!defined($Conf{$_}));
+  }
+  # $Conf{'TLH'} is checked in gatherstats.pl
+  return $ConfR;
 };
 ################################################################################
 
