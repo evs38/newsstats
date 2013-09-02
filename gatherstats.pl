@@ -1,4 +1,4 @@
-#! /usr/bin/perl -W
+#! /usr/bin/perl
 #
 # gatherstats.pl
 #
@@ -18,6 +18,7 @@ BEGIN {
   push(@INC, dirname($0));
 }
 use strict;
+use warnings;
 
 use NewsStats qw(:DEFAULT :TimePeriods ListNewsgroups ParseHierarchies ReadGroupList);
 
