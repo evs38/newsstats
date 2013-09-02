@@ -36,12 +36,12 @@ GetOptions ('u|update=s' => \$OptUpdate,
             'V|version'  => \&ShowVersion) or exit 1;
 
 ### change working directory to .. (as we're in .../install)
-chdir dirname($0).'/..';
+chdir dirname($FullPath).'/..';
 my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig($Path.'/newsstats.conf')};
 
 ##### --------------------------------------------------------------------------
 ##### Database table definitions
