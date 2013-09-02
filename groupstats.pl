@@ -100,8 +100,13 @@ my ($CaptionPeriod,$SQLWherePeriod) = &GetTimePeriod($OptMonth);
          "please use 'YYYY-MM', 'YYYY-MM:YYYY-MM' or 'ALL'!") if !$CaptionPeriod;
 # get list of newsgroups and set expression for SQL 'WHERE' clause
 # with placeholders as well as a list of newsgroup to bind to them
-my ($SQLWhereNewsgroups,@SQLBindNewsgroups) = &SQLGroupList($OptNewsgroups)
-  if $OptNewsgroups;;
+my ($SQLWhereNewsgroups,@SQLBindNewsgroups);
+if ($OptNewsgroups) {
+  ($SQLWhereNewsgroups,@SQLBindNewsgroups) = &SQLGroupList($OptNewsgroups);
+  # bail out if --newsgroups is invalid
+  &Bleat(2,"--newsgroups option has an invalid format!")
+    if !$SQLWhereNewsgroups;
+}
 
 ### build SQL WHERE clause (and HAVING clause, if needed)
 my ($SQLWhereClause,$SQLHavingClause);
@@ -194,8 +199,8 @@ if ($OptBoundType and $OptBoundType ne 'default') {
 $DBQuery = $DBHandle->prepare(sprintf('SELECT %s FROM %s.%s %s %s %s',
                                       $SQLSelect,
                                       $Conf{'DBDatabase'},$Conf{'DBTableGrps'},
-                                      $SQLWhereClause,$SQLGroupClause,$
-                                      SQLOrderClause));
+                                      $SQLWhereClause,$SQLGroupClause,
+                                      $SQLOrderClause));
 
 # execute query
 $DBQuery->execute(@SQLBindNewsgroups)
