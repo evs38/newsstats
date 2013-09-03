@@ -73,6 +73,8 @@ $OptStatsType = 'all' if !$OptStatsType;
 ### get time period from --month
 # get verbal description of time period, drop SQL code
 my ($Period) = &GetTimePeriod($OptMonth);
+# bail out if --month is invalid or set to 'ALL';
+# we don't support the latter
 &Bleat(2,"--month option has an invalid format - please use 'YYYY-MM' or ".
          "'YYYY-MM:YYYY-MM'!") if (!$Period or $Period eq 'all time');
 

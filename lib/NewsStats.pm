@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# This module can be redistributed and/or modified under the same terms under 
+# This module can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 package NewsStats;
@@ -244,7 +244,7 @@ sub ReadGroupList {
 ### ignoring everything after the first whitespace and so accepting files
 ### in checkgroups format as well as (parts of) an INN active file)
 ### IN : $Filename    : file to read
-### OUT: \%ValidGroups: hash containing all valid newsgroups
+### OUT: \%ValidGroups: reference to a hash containing all valid newsgroups
   my ($Filename) = @_;
   my %ValidGroups;
   open (my $LIST,"<$Filename") or &Bleat(2,"Cannot read $Filename: $!");
@@ -275,12 +275,12 @@ sub GetTimePeriod {
   my ($Verbal, $SQL);
   # define a regular expression for a month
   my $REMonth = '\d{4}-\d{2}';
-  
+
   # default to last month if option is not set
   if(!$Month) {
     $Month = &LastMonth;
   }
-  
+
   # check for valid input
   if ($Month =~ /^$REMonth$/) {
     # single month (YYYY-MM)
@@ -299,7 +299,7 @@ sub GetTimePeriod {
     # invalid input
     return (undef,undef);
   }
-  
+
   return ($Verbal,$SQL);
 };
 
@@ -407,7 +407,7 @@ sub OutputData {
   my %ValidKeys = %{$ValidKeys} if $ValidKeys;
   my ($FileName, $Handle, $OUT);
   our $LastIteration;
-  
+
   # define output types
   my %LegalOutput;
   @LegalOutput{('dump','list','pretty')} = ();
@@ -439,7 +439,7 @@ sub OutputData {
       # safeguards for filename creation:
       # replace potential problem characters with '_'
       $FileName = sprintf('%s-%s',$FileTempl,$Caption);
-      $FileName =~ s/[^a-zA-Z0-9_-]+/_/g; 
+      $FileName =~ s/[^a-zA-Z0-9_-]+/_/g;
       open ($OUT,">$FileName")
         or &Bleat(2,sprintf("Cannot open output file '%s': $!",
                             $FileName));
@@ -776,5 +776,3 @@ sub CheckValidNewsgroups {
 
 #####------------------------------- done ---------------------------------#####
 1;
-
-
