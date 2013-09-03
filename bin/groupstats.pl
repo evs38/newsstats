@@ -4,12 +4,12 @@
 #
 # This script will get statistical data on newgroup usage
 # from a database.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
@@ -347,7 +347,7 @@ Print out version and copyright information and exit.
 
 Print this man page and exit.
 
-=item B<-m>, B<--month> I<YYYY-MM[:YYYY-MM]|all> 
+=item B<-m>, B<--month> I<YYYY-MM[:YYYY-MM]|all>
 
 Set processing period to a single month in YYYY-MM format or to a time
 period between two month in YYYY-MM:YYYY-MM format (two month, separated

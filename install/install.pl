@@ -3,12 +3,12 @@
 # install.pl
 #
 # This script will create database tables as necessary.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
@@ -185,7 +185,7 @@ if (!$OptUpdate) {
     &CreateTable($Table);
   };
   print "Database table generation done.\n";
- 
+
   # Display install instructions
   print $Install;
 } else {

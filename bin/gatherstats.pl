@@ -4,12 +4,12 @@
 #
 # This script will gather statistical information from a database
 # containing headers and other information from a INN feed.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
@@ -292,7 +292,7 @@ conjunction with B<--test> ... everything else seems a bit pointless.
 
 Set processing period to a single month in YYYY-MM format or to a time
 period between two month in YYYY-MM:YYYY-MM format (two month, separated
-by a colon). 
+by a colon).
 
 =item B<-s>, B<--stats> I<type>
 
