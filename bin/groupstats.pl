@@ -126,12 +126,17 @@ if ($OptBoundType and $OptBoundType ne 'default') {
 }
 
 ### get sort order and build SQL 'ORDER BY' clause
+# force to 'month' for $OptReportType 'average' or 'sum'
+$OptGroupBy = 'month' if ($OptReportType and $OptReportType ne 'default');
 # default to 'newsgroup' for $OptBoundType 'level' or 'average'
 $OptGroupBy = 'newsgroup' if (!$OptGroupBy and
                               $OptBoundType and $OptBoundType ne 'default');
-# force to 'month' for $OptReportType 'average' or 'sum'
-$OptGroupBy = 'month' if ($OptReportType and $OptReportType ne 'default');
+# default to 'newsgroup' if $OptGroupBy is not set and
+# just one newsgroup is requested, but more than one month
+$OptGroupBy = 'newsgroup' if (!$OptGroupBy and
+                              $OptMonth =~ /:/ and $OptNewsgroups !~ /[:*%]/);
 # parse $OptGroupBy to $GroupBy, create ORDER BY clause $SQLOrderClause
+# if $OptGroupBy is still not set, SQLSortOrder() will default to 'month'
 my ($GroupBy,$SQLOrderClause) = SQLSortOrder($OptGroupBy, $OptOrderBy);
 # $GroupBy will contain 'month' or 'newsgroup' (parsed result of $OptGroupBy)
 # set it to 'month' or 'key' for OutputData()
