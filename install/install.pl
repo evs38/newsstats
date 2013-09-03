@@ -53,7 +53,7 @@ my $DBCreate = <<SQLDB;
 CREATE DATABASE IF NOT EXISTS `$Conf{'DBDatabase'}` DEFAULT CHARSET=utf8;
 SQLDB
 
-my %DBCreate = ('DBTableRaw'  => <<RAW, 'DBTableGrps' => <<GRPS);
+my %DBCreate = ('DBTableRaw'  => <<RAW, 'DBTableParse'  => <<PARSE, 'DBTableGrps' => <<GRPS);
 --
 -- Table structure for table DBTableRaw
 --
@@ -77,6 +77,56 @@ CREATE TABLE IF NOT EXISTS `$Conf{'DBTableRaw'}` (
   KEY `peer` (`peer`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='Raw data';
 RAW
+--
+-- Table structure for table DBTableParse
+--
+
+CREATE TABLE IF NOT EXISTS `$Conf{'DBTableParse'}` (
+  `id` bigint(20) unsigned NOT NULL auto_increment,
+  `day` date NOT NULL,
+  `mid` varchar(250) character set ascii NOT NULL,
+  `refs` varchar(1000) character set ascii,
+  `date` varchar(100) NOT NULL,
+  `path` varchar(1000) NOT NULL,
+  `newsgroups` varchar(1000) NOT NULL,
+  `fupto` varchar(200),
+  `from_` varchar(500),
+  `from_parsed` varchar(200),
+  `from_name` varchar(200),
+  `from_address` varchar(200),
+  `sender` varchar(500),
+  `sender_parsed` varchar(200),
+  `sender_name` varchar(200),
+  `sender_address` varchar(200),
+  `replyto` varchar(500),
+  `replyto_parsed` varchar(200),
+  `replyto_name` varchar(200),
+  `replyto_address` varchar(200),
+  `subject` varchar(1000) NOT NULL,
+  `subject_parsed` varchar(1000),
+  `organization` varchar(1000),
+  `linecount` int(4) unsigned,
+  `approved` varchar(250),
+  `supersedes` varchar(250),
+  `expires` varchar(100),
+  `useragent` varchar(500),
+  `xnewsreader` varchar(500),
+  `xmailer` varchar(500),
+  `xnoarchive` varchar(100),
+  `contenttype` varchar(500),
+  `contentencoding` varchar(500),
+  `cancellock` varchar(500),
+  `injectioninfo` varchar(500),
+  `xtrace` varchar(500),
+  `postinghost` varchar(1000),
+  `headers` longtext,
+  `disregard` tinyint(1) default '0',
+  PRIMARY KEY  (`id`),
+  KEY `day` (`day`),
+  KEY `mid` (`mid`),
+  KEY `newsgroups` (`newsgroups`)
+) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='Parsed data';
+PARSE
 --
 -- Table structure for table DBTableGrps
 --

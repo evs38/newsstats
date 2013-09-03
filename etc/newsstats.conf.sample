@@ -4,13 +4,14 @@
 #
 DBDriver   = mysql
 DBHost     = localhost
-DBUser     = 
-DBPw       = 
+DBUser     =
+DBPw       =
 DBDatabase = newsstats
 #
 # tables
 #
 DBTableRaw   = raw_de
+DBTableParse = parsed_de
 DBTableGrps  = groups_de
 #DBTableClnts =
 #DBTableHosts =

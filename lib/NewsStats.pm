@@ -107,7 +107,7 @@ sub ReadConfig {
   $ConfFile = $HomePath . '/etc/newsstats.conf' if !$ConfFile;
   # mandatory configuration options
   my @Mandatory = ('DBDriver','DBHost','DBUser','DBPw','DBDatabase',
-                   'DBTableRaw','DBTableGrps');
+                   'DBTableRaw','DBTableParse','DBTableGrps');
   # read config via Config::Auto
   my $ConfR = Config::Auto::parse($ConfFile, format => 'equal');
   my %Conf  = %{$ConfR};
