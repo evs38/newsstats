@@ -15,7 +15,8 @@
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  push(@INC, dirname($0));
+  # we're in .../bin, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -75,7 +76,7 @@ GetOptions ('d|debug!'        => \$OptDebug,
             'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig('')};
 
 ### init syslog
 openlog($0, 'nofatal,pid', LOG_NEWS);
@@ -218,15 +219,15 @@ See L<doc/INSTALL> for further information.
 
 =over 4
 
-=item F<feedlog.pl>
+=item F<bin/feedlog.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 

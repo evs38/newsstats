@@ -15,7 +15,8 @@
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  push(@INC, dirname($0));
+  # we're in .../bin, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -81,7 +82,7 @@ if ($OptReportType) {
 my $ValidGroups = &ReadGroupList($OptCheckgroupsFile) if $OptCheckgroupsFile;
 
 ### read configuration
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig('')};
 
 ### override configuration via commandline options
 my %ConfOverride;
@@ -635,15 +636,15 @@ machine-readable form (without formatting):
 
 =over 4
 
-=item F<groupstats.pl>
+=item F<bin/groupstats.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 

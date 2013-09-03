@@ -14,8 +14,8 @@
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  # we're in .../install, so our module is in ..
-  push(@INC, dirname($0).'/..');
+  # we're in .../install, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -42,7 +42,7 @@ my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
-my %Conf = %{ReadConfig($Path.'/newsstats.conf')};
+my %Conf = %{ReadConfig('')};
 
 ##### --------------------------------------------------------------------------
 ##### Database table definitions
@@ -294,15 +294,15 @@ Don't do a fresh install, but update from I<version>.
 
 =over 4
 
-=item F<install.pl>
+=item F<install/install.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 
