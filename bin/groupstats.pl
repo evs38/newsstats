@@ -4,18 +4,19 @@
 #
 # This script will get statistical data on newgroup usage
 # from a database.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  push(@INC, dirname($0));
+  # we're in .../bin, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -31,7 +32,7 @@ Getopt::Long::config ('bundling');
 ### read commandline options
 my ($OptBoundType,$OptCaptions,$OptCheckgroupsFile,$OptComments,
     $OptFileTemplate,$OptFormat,$OptGroupBy,$OptGroupsDB,$LowBound,$OptMonth,
-    $OptNewsgroups,$OptOrderBy,$OptReportType,$OptSums,$UppBound);
+    $OptNewsgroups,$OptOrderBy,$OptReportType,$OptSums,$UppBound,$OptConfFile);
 GetOptions ('b|boundary=s'   => \$OptBoundType,
             'c|captions!'    => \$OptCaptions,
             'checkgroups=s'  => \$OptCheckgroupsFile,
@@ -47,6 +48,7 @@ GetOptions ('b|boundary=s'   => \$OptBoundType,
             'r|report=s'     => \$OptReportType,
             's|sums!'        => \$OptSums,
             'u|upper=i'      => \$UppBound,
+            'conffile=s'     => \$OptConfFile,
             'h|help'         => \&ShowPOD,
             'V|version'      => \&ShowVersion) or exit 1;
 # parse parameters
@@ -81,7 +83,7 @@ if ($OptReportType) {
 my $ValidGroups = &ReadGroupList($OptCheckgroupsFile) if $OptCheckgroupsFile;
 
 ### read configuration
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ### override configuration via commandline options
 my %ConfOverride;
@@ -244,7 +246,7 @@ if ($OptCaptions && $OptComments) {
          ($OptOrderBy and $OptOrderBy =~ /posting/i) ? 'by number of postings ' : '',
          ($OptOrderBy and $OptOrderBy =~ /-?desc$/i) ? 'descending' : 'ascending');
 }
- 
+
 # output data
 &OutputData($OptFormat,$OptComments,$GroupBy,$Precision,
             $OptCheckgroupsFile ? $ValidGroups : '',
@@ -263,7 +265,7 @@ groupstats - create reports on newsgroup usage
 
 =head1 SYNOPSIS
 
-B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>]
+B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -346,7 +348,7 @@ Print out version and copyright information and exit.
 
 Print this man page and exit.
 
-=item B<-m>, B<--month> I<YYYY-MM[:YYYY-MM]|all> 
+=item B<-m>, B<--month> I<YYYY-MM[:YYYY-MM]|all>
 
 Set processing period to a single month in YYYY-MM format or to a time
 period between two month in YYYY-MM:YYYY-MM format (two month, separated
@@ -592,6 +594,10 @@ B<--nocomments> is enforced, see above.
 
 Override I<DBTableGrps> from F<newsstats.conf>.
 
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
+
 =back
 
 =head1 INSTALLATION
@@ -635,15 +641,15 @@ machine-readable form (without formatting):
 
 =over 4
 
-=item F<groupstats.pl>
+=item F<bin/groupstats.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 

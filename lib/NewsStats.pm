@@ -54,15 +54,19 @@ our $PackageVersion = '0.01';
 
 use Data::Dumper;
 use File::Basename;
+use Cwd qw(realpath);
 
 use Config::Auto;
 use DBI;
 
 #####-------------------------------- Vars --------------------------------#####
 
-# trim the path
+# save $0 in $FullPath
 our $FullPath = $0;
-our $HomePath = dirname($0);
+# strip filename and /bin or /install directory to create the $HomePath
+our $HomePath = dirname(realpath($0));
+$HomePath =~ s/\/(bin|install)//;
+# trim $0
 $0 =~ s%.*/%%;
 # set version string
 our $MyVersion = "$0 $::VERSION (NewsStats.pm $VERSION)";
@@ -99,6 +103,8 @@ sub ReadConfig {
 ### IN : $ConfFile: config filename
 ### OUT: reference to a hash containing the configuration
   my ($ConfFile) = @_;
+  # set default
+  $ConfFile = $HomePath . '/etc/newsstats.conf' if !$ConfFile;
   # mandatory configuration options
   my @Mandatory = ('DBDriver','DBHost','DBUser','DBPw','DBDatabase',
                    'DBTableRaw','DBTableGrps');

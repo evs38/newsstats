@@ -4,18 +4,19 @@
 #
 # This script will log headers and other data to a database
 # for further analysis by parsing a feed from INN.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  push(@INC, dirname($0));
+  # we're in .../bin, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -68,14 +69,15 @@ sub PrepareDB {
 ################################# Main program #################################
 
 ### read commandline options
-my ($OptDebug,$OptQuiet);
+my ($OptDebug,$OptQuiet,$OptConfFile);
 GetOptions ('d|debug!'        => \$OptDebug,
             'q|test!'         => \$OptQuiet,
+            'conffile=s'      => \$OptConfFile,
             'h|help'          => \&ShowPOD,
             'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ### init syslog
 openlog($0, 'nofatal,pid', LOG_NEWS);
@@ -129,7 +131,7 @@ while (<>) {
     };
   };
   $DBQuery->finish;
-  
+
   warn sprintf("-----\nDay: %s\nDate: %s\nMID: %s\nTS: %s\nToken: %s\n".
                "Size: %s\nPeer: %s\nPath: %s\nNewsgroups: %s\nHeaders: %s\n",
                $Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path,
@@ -151,7 +153,7 @@ feedlog - log data from an INN feed to a database
 
 =head1 SYNOPSIS
 
-B<feedlog> [B<-Vhdq>]
+B<feedlog> [B<-Vhdq>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -197,6 +199,10 @@ find that information most probably in your B<INN> F<errlog> file.
 
 Suppress logging to syslog.
 
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
+
 =back
 
 =head1 INSTALLATION
@@ -218,15 +224,15 @@ See L<doc/INSTALL> for further information.
 
 =over 4
 
-=item F<feedlog.pl>
+=item F<bin/feedlog.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 

@@ -3,19 +3,19 @@
 # install.pl
 #
 # This script will create database tables as necessary.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  # we're in .../install, so our module is in ..
-  push(@INC, dirname($0).'/..');
+  # we're in .../install, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -31,8 +31,9 @@ Getopt::Long::config ('bundling');
 ################################# Main program #################################
 
 ### read commandline options
-my ($OptUpdate);
+my ($OptUpdate,$OptConfFile);
 GetOptions ('u|update=s' => \$OptUpdate,
+            'conffile=s' => \$OptConfFile,
             'h|help'     => \&ShowPOD,
             'V|version'  => \&ShowVersion) or exit 1;
 
@@ -42,7 +43,7 @@ my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
-my %Conf = %{ReadConfig($Path.'/newsstats.conf')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ##### --------------------------------------------------------------------------
 ##### Database table definitions
@@ -53,9 +54,9 @@ CREATE DATABASE IF NOT EXISTS `$Conf{'DBDatabase'}` DEFAULT CHARSET=utf8;
 SQLDB
 
 my %DBCreate = ('DBTableRaw'  => <<RAW, 'DBTableGrps' => <<GRPS);
--- 
+--
 -- Table structure for table DBTableRaw
--- 
+--
 
 CREATE TABLE IF NOT EXISTS `$Conf{'DBTableRaw'}` (
   `id` bigint(20) unsigned NOT NULL auto_increment,
@@ -76,9 +77,9 @@ CREATE TABLE IF NOT EXISTS `$Conf{'DBTableRaw'}` (
   KEY `peer` (`peer`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8 COMMENT='Raw data';
 RAW
--- 
+--
 -- Table structure for table DBTableGrps
--- 
+--
 
 CREATE TABLE IF NOT EXISTS `$Conf{'DBTableGrps'}` (
   `id` bigint(20) unsigned NOT NULL auto_increment,
@@ -167,7 +168,7 @@ if (!$OptUpdate) {
   my $DBQuery = $DBHandle->prepare($DBCreate);
   $DBQuery->execute() or &Bleat(2, sprintf("Can't create database %s: %s%\n",
                                            $Conf{'DBDatabase'}, $DBI::errstr));
-  
+
   printf("Database table %s created succesfully.\n",$Conf{'DBDatabase'});
   $DBHandle->disconnect;
 };
@@ -185,7 +186,7 @@ if (!$OptUpdate) {
     &CreateTable($Table);
   };
   print "Database table generation done.\n";
- 
+
   # Display install instructions
   print $Install;
 } else {
@@ -255,7 +256,7 @@ install - installation script
 
 =head1 SYNOPSIS
 
-B<install> [B<-Vh> [--update I<version>]
+B<install> [B<-Vh> [--update I<version>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -288,21 +289,25 @@ Print this man page and exit.
 
 Don't do a fresh install, but update from I<version>.
 
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
+
 =back
 
 =head1 FILES
 
 =over 4
 
-=item F<install.pl>
+=item F<install/install.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 

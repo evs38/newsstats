@@ -4,18 +4,19 @@
 #
 # This script will gather statistical information from a database
 # containing headers and other information from a INN feed.
-# 
+#
 # It is part of the NewsStats package.
 #
 # Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 #
-# It can be redistributed and/or modified under the same terms under 
+# It can be redistributed and/or modified under the same terms under
 # which Perl itself is published.
 
 BEGIN {
   our $VERSION = "0.01";
   use File::Basename;
-  push(@INC, dirname($0));
+  # we're in .../bin, so our module is in ../lib
+  push(@INC, dirname($0).'/../lib');
 }
 use strict;
 use warnings;
@@ -37,7 +38,7 @@ my %LegalStats;
 
 ### read commandline options
 my ($OptCheckgroupsFile,$OptClientsDB,$OptDebug,$OptGroupsDB,$OptTLH,
-    $OptHostsDB,$OptMonth,$OptRawDB,$OptStatsType,$OptTest);
+    $OptHostsDB,$OptMonth,$OptRawDB,$OptStatsType,$OptTest,$OptConfFile);
 GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
             'clientsdb=s'     => \$OptClientsDB,
             'd|debug!'        => \$OptDebug,
@@ -48,11 +49,12 @@ GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
             'rawdb=s'         => \$OptRawDB,
             's|stats=s'       => \$OptStatsType,
             't|test!'         => \$OptTest,
+            'conffile=s'      => \$OptConfFile,
             'h|help'          => \&ShowPOD,
             'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig($HomePath.'/newsstats.conf')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ### override configuration via commandline options
 my %ConfOverride;
@@ -160,7 +162,7 @@ foreach my $Month (&ListMonth($Period)) {
         }
       };
     };
-    
+
     # delete old data for that month
     if (!$OptTest) {
       $DBQuery = $DBHandle->do(sprintf("DELETE FROM %s.%s WHERE month = ?",
@@ -206,7 +208,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -291,7 +293,7 @@ conjunction with B<--test> ... everything else seems a bit pointless.
 
 Set processing period to a single month in YYYY-MM format or to a time
 period between two month in YYYY-MM:YYYY-MM format (two month, separated
-by a colon). 
+by a colon).
 
 =item B<-s>, B<--stats> I<type>
 
@@ -339,6 +341,10 @@ Override I<DBTableClnts> from F<newsstats.conf>.
 
 Override I<DBTableHosts> from F<newsstats.conf>.
 
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
+
 =back
 
 =head1 INSTALLATION
@@ -368,15 +374,15 @@ checking against checkgroups-*:
 
 =over 4
 
-=item F<gatherstats.pl>
+=item F<bin/gatherstats.pl>
 
 The script itself.
 
-=item F<NewsStats.pm>
+=item F<lib/NewsStats.pm>
 
 Library functions for the NewsStats package.
 
-=item F<newsstats.conf>
+=item F<etc/newsstats.conf>
 
 Runtime configuration file.
 
