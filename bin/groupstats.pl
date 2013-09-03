@@ -78,9 +78,16 @@ if ($OptReportType) {
     $OptReportType  = 'default';
   }
 }
-# read list of newsgroups from --checkgroups
-# into a hash reference
-my $ValidGroups = &ReadGroupList($OptCheckgroupsFile) if $OptCheckgroupsFile;
+# honor $OptCheckgroupsFile,
+# warn for $OptSums if set concurrently
+my $ValidGroups;
+if ($OptCheckgroupsFile) {
+  # read list of newsgroups from --checkgroups
+  # into a hash reference
+  $ValidGroups = &ReadGroupList($OptCheckgroupsFile);
+  &Bleat(1,"--sums option can't possibly work with --checkgroups option set")
+    if $OptSums;
+}
 
 ### read configuration
 my %Conf = %{ReadConfig($OptConfFile)};
@@ -375,6 +382,9 @@ example:
 
 See the B<gatherstats> man page for details.
 
+This option does not work together with the B<--checkgroups> option as
+all "virtual" groups will not be present in the checkgroups file.
+
 =item B<--checkgroups> I<filename>
 
 Restrict output to those newgroups present in a file in checkgroups format
@@ -383,6 +393,9 @@ line is ignored). All other newsgroups will be removed from output.
 
 Contrary to B<gatherstats>, I<filename> is not a template, but refers to
 a single file in checkgroups format.
+
+The B<--sums> option will not work together with this option as "virtual"
+groups will not be present in the checkgroups file.
 
 =item B<-r>, B<--report> I<default|average|sums>
 
