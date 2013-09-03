@@ -47,6 +47,7 @@ Prerequisites
       - Config::Auto
       - Date::Format
       - DBI
+      - Mail::Address
 
     * mysql 5.0.x
 

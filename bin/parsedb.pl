@@ -27,6 +27,9 @@ use DBI;
 use Getopt::Long qw(GetOptions);
 Getopt::Long::config ('bundling');
 
+use Encode qw/decode/;
+use Mail::Address;
+
 ################################# Definitions ##################################
 
 # define header names with separate database fields
@@ -156,6 +159,43 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
   # replace old (now parsed) $Headers{'headers'} with remanining $OtherHeaders
   chomp($OtherHeaders);
   $Headers{'headers'} = $OtherHeaders;
+
+  foreach ('from_','sender', 'replyto', 'subject') {
+    if ($Headers{$_}) {
+      my $HeaderName = $_;
+      $HeaderName  =~ s/_$//;
+      # decode From: / Sender: / Reply-To: / Subject:
+      if ($Headers{$_} =~ /\?(B|Q)\?/) {
+        $Headers{$HeaderName.'_parsed'} = decode('MIME-Header',$Headers{$_});
+      }
+      # extract name(s) and mail(s) from From: / Sender: / Reply-To:
+      # in parsed form, if available
+      if ($_ ne 'subject') {
+        my @Address;
+        # start parser on header or parsed header
+        # @Address will have an array of Mail::Address objects, one for
+        # each name/mail (you can have more than one person in From:!)
+        if (defined($Headers{$HeaderName.'_parsed'})) {
+          @Address = Mail::Address->parse($Headers{$HeaderName.'_parsed'});
+        } else {
+          @Address = Mail::Address->parse($Headers{$_});
+        }
+        # split each Mail::Address object
+        foreach (@Address) {
+          # take address part
+          $Headers{$HeaderName.'_address'} = $_->address();
+          # take name part form "phrase", if there is one:
+          # From: My Name <addr@ess> (Comment)
+          # otherwise, take it from "comment":
+          # From: addr@ess (Comment)
+          $Headers{$HeaderName.'_name'} = $_->comment()
+            unless $Headers{$HeaderName.'_name'}= $_->phrase;
+          $Headers{$HeaderName.'_name'} =~ s/^\((.+)\)$/$1/;
+          # FIMXE - handle more than one Mail::Address object!
+        }
+      }
+    }
+  }
 
   # order output for database entry: fill @SQLBindVars
   print "-------------- Next entry:\n" if $OptDebug;
