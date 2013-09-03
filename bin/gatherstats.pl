@@ -38,7 +38,7 @@ my %LegalStats;
 
 ### read commandline options
 my ($OptCheckgroupsFile,$OptClientsDB,$OptDebug,$OptGroupsDB,$OptTLH,
-    $OptHostsDB,$OptMonth,$OptRawDB,$OptStatsType,$OptTest);
+    $OptHostsDB,$OptMonth,$OptRawDB,$OptStatsType,$OptTest,$OptConfFile);
 GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
             'clientsdb=s'     => \$OptClientsDB,
             'd|debug!'        => \$OptDebug,
@@ -49,11 +49,12 @@ GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
             'rawdb=s'         => \$OptRawDB,
             's|stats=s'       => \$OptStatsType,
             't|test!'         => \$OptTest,
+            'conffile=s'      => \$OptConfFile,
             'h|help'          => \&ShowPOD,
             'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig('')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ### override configuration via commandline options
 my %ConfOverride;
@@ -161,7 +162,7 @@ foreach my $Month (&ListMonth($Period)) {
         }
       };
     };
-    
+
     # delete old data for that month
     if (!$OptTest) {
       $DBQuery = $DBHandle->do(sprintf("DELETE FROM %s.%s WHERE month = ?",
@@ -207,7 +208,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -339,6 +340,10 @@ Override I<DBTableClnts> from F<newsstats.conf>.
 =item B<--hostsdb> I<table> (host data table)
 
 Override I<DBTableHosts> from F<newsstats.conf>.
+
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
 
 =back
 

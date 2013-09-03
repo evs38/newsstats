@@ -32,7 +32,7 @@ Getopt::Long::config ('bundling');
 ### read commandline options
 my ($OptBoundType,$OptCaptions,$OptCheckgroupsFile,$OptComments,
     $OptFileTemplate,$OptFormat,$OptGroupBy,$OptGroupsDB,$LowBound,$OptMonth,
-    $OptNewsgroups,$OptOrderBy,$OptReportType,$OptSums,$UppBound);
+    $OptNewsgroups,$OptOrderBy,$OptReportType,$OptSums,$UppBound,$OptConfFile);
 GetOptions ('b|boundary=s'   => \$OptBoundType,
             'c|captions!'    => \$OptCaptions,
             'checkgroups=s'  => \$OptCheckgroupsFile,
@@ -48,6 +48,7 @@ GetOptions ('b|boundary=s'   => \$OptBoundType,
             'r|report=s'     => \$OptReportType,
             's|sums!'        => \$OptSums,
             'u|upper=i'      => \$UppBound,
+            'conffile=s'     => \$OptConfFile,
             'h|help'         => \&ShowPOD,
             'V|version'      => \&ShowVersion) or exit 1;
 # parse parameters
@@ -82,7 +83,7 @@ if ($OptReportType) {
 my $ValidGroups = &ReadGroupList($OptCheckgroupsFile) if $OptCheckgroupsFile;
 
 ### read configuration
-my %Conf = %{ReadConfig('')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ### override configuration via commandline options
 my %ConfOverride;
@@ -245,7 +246,7 @@ if ($OptCaptions && $OptComments) {
          ($OptOrderBy and $OptOrderBy =~ /posting/i) ? 'by number of postings ' : '',
          ($OptOrderBy and $OptOrderBy =~ /-?desc$/i) ? 'descending' : 'ascending');
 }
- 
+
 # output data
 &OutputData($OptFormat,$OptComments,$GroupBy,$Precision,
             $OptCheckgroupsFile ? $ValidGroups : '',
@@ -264,7 +265,7 @@ groupstats - create reports on newsgroup usage
 
 =head1 SYNOPSIS
 
-B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>]
+B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -592,6 +593,10 @@ B<--nocomments> is enforced, see above.
 =item B<--groupsdb> I<database table>
 
 Override I<DBTableGrps> from F<newsstats.conf>.
+
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
 
 =back
 

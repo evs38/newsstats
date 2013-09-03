@@ -69,14 +69,15 @@ sub PrepareDB {
 ################################# Main program #################################
 
 ### read commandline options
-my ($OptDebug,$OptQuiet);
+my ($OptDebug,$OptQuiet,$OptConfFile);
 GetOptions ('d|debug!'        => \$OptDebug,
             'q|test!'         => \$OptQuiet,
+            'conffile=s'      => \$OptConfFile,
             'h|help'          => \&ShowPOD,
             'V|version'       => \&ShowVersion) or exit 1;
 
 ### read configuration
-my %Conf = %{ReadConfig('')};
+my %Conf = %{ReadConfig($OptConfFile)};
 
 ### init syslog
 openlog($0, 'nofatal,pid', LOG_NEWS);
@@ -130,7 +131,7 @@ while (<>) {
     };
   };
   $DBQuery->finish;
-  
+
   warn sprintf("-----\nDay: %s\nDate: %s\nMID: %s\nTS: %s\nToken: %s\n".
                "Size: %s\nPeer: %s\nPath: %s\nNewsgroups: %s\nHeaders: %s\n",
                $Day, $Date, $Mid, $Timestamp, $Token, $Size, $Peer, $Path,
@@ -152,7 +153,7 @@ feedlog - log data from an INN feed to a database
 
 =head1 SYNOPSIS
 
-B<feedlog> [B<-Vhdq>]
+B<feedlog> [B<-Vhdq>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -197,6 +198,10 @@ find that information most probably in your B<INN> F<errlog> file.
 =item B<-q>, B<--quiet>
 
 Suppress logging to syslog.
+
+=item B<--conffile> I<filename>
+
+Load configuration from I<filename> instead of F<newsstats.conf>.
 
 =back
 
