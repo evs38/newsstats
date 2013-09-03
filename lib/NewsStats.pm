@@ -265,33 +265,39 @@ sub ReadGroupList {
 ################################################################################
 sub GetTimePeriod {
 ################################################################################
-### get a time period to act on from --month option;
-### if empty, default to last month
-### IN : $Month: may be empty, 'YYYY-MM', 'YYYY-MM:YYYY-MM' or 'all'
+### get a time period to act on from --month / --day option;
+### if empty, default to last month / day
+### IN : $Period: may be empty, 'YYYY-MM(-DD)', 'YYYY-MM(-DD):YYYY-MM(-DD)'
+###               or 'all'
+###      $Type  : may be 'month' or 'day'
 ### OUT: $Verbal,$SQL: verbal description and WHERE-clause
 ###                    of the chosen time period
-  my ($Month) = @_;
+  my ($Period,$Type) = @_;
   # define result variables
   my ($Verbal, $SQL);
-  # define a regular expression for a month
-  my $REMonth = '\d{4}-\d{2}';
+  # check $Type
+  $Type = 'month' if (!$Type or ($Type ne 'month' and $Type ne 'day'));
+  # define a regular expressions for a month or day
+  my $REPeriod = '\d{4}-\d{2}';
+  $REPeriod .= '-\d{2}' if ($Type eq 'day');
 
-  # default to last month if option is not set
-  if(!$Month) {
-    $Month = &LastMonth;
+  # default to last month / day if option is not set
+  if(!$Period) {
+    $Period = &LastMonthDay($Type);
   }
 
   # check for valid input
-  if ($Month =~ /^$REMonth$/) {
-    # single month (YYYY-MM)
-    ($Month) = &CheckMonth($Month);
-    $Verbal  = $Month;
-    $SQL     = sprintf("month = '%s'",$Month);
-  } elsif ($Month =~ /^$REMonth:$REMonth$/) {
-    # time period (YYYY-MM:YYYY-MM)
-    $Verbal = sprintf('%s to %s',&SplitPeriod($Month));
-    $SQL    = sprintf("month BETWEEN '%s' AND '%s'",&SplitPeriod($Month));
-  } elsif ($Month =~ /^all$/i) {
+  if ($Period =~ /^$REPeriod$/) {
+    # single month/day [YYYY-MM(-DD)]
+    ($Period) = &CheckPeriod($Type,$Period);
+    $Verbal  = $Period;
+    $SQL     = sprintf("%s = '%s'",$Type,$Period);
+  } elsif ($Period =~ /^$REPeriod:$REPeriod$/) {
+    # time period [YYYY-MM(-DD):YYYY-MM(-DD)]
+    $Verbal = sprintf('%s to %s',&SplitPeriod($Period,$Type));
+    $SQL    = sprintf("%s BETWEEN '%s' AND '%s'",$Type,
+                      &SplitPeriod($Period,$Type));
+  } elsif ($Period =~ /^all$/i) {
     # special case: ALL
     $Verbal = 'all time';
     $SQL    = '';
@@ -304,58 +310,82 @@ sub GetTimePeriod {
 };
 
 ################################################################################
-sub LastMonth {
+sub LastMonthDay {
 ################################################################################
-### get last month from todays date in YYYY-MM format
-### OUT: last month as YYYY-MM
-  # get today's date
-  my (undef,undef,undef,undef,$Month,$Year,undef,undef,undef) = localtime(time);
-  # $Month is already defined from 0 to 11, so no need to decrease it by 1
+### get last month/day from todays date in YYYY-MM format
+### IN : $Type  : may be 'month' or 'day'
+### OUT: last month/day as YYYY-MM(-DD)
+  my ($Type) = @_;
+  my ($Day,$Month,$Year);
+  if ($Type eq 'day') {
+    # get yesterdays's date
+    (undef,undef,undef,$Day,$Month,$Year,undef,undef,undef) = localtime(time-86400);
+    # $Month is defined from 0 to 11, so add 1
+    $Month++;
+  } else {
+    # get today's date (month and year)
+    (undef,undef,undef,undef,$Month,$Year,undef,undef,undef) = localtime(time);
+    # $Month is already defined from 0 to 11, so no need to decrease it by 1
+    if ($Month < 1) {
+      $Month = 12;
+      $Year--;
+    };
+  }
   $Year += 1900;
-  if ($Month < 1) {
-    $Month = 12;
-    $Year--;
-  };
-  # return last month
-  return sprintf('%4d-%02d',$Year,$Month);
+  # return last month / day
+  if ($Type eq 'day') {
+    return sprintf('%4d-%02d-%02d',$Year,$Month,$Day);
+  } else {
+    return sprintf('%4d-%02d',$Year,$Month);
+  }
 };
 
 ################################################################################
-sub CheckMonth {
+sub CheckPeriod {
 ################################################################################
-### check if input (in YYYY-MM form) is valid with MM between 01 and 12;
+### check if input (in YYYY-MM(-DD) form) is a valid month / day;
 ### otherwise, fix it
-### IN : @Month: array of month
-### OUT: @Month: a valid month
-  my (@Month) = @_;
-  foreach my $Month (@Month) {
-    my ($OldMonth) = $Month;
-    my ($CalMonth) = substr ($Month, -2);
-    if ($CalMonth < 1 or $CalMonth > 12) {
+### IN : $Type  : may be 'month' or 'day'
+###      @Period: array of month/day
+### OUT: @Period: a valid month/day
+  my ($Type,@Period) = @_;
+  foreach my $Period (@Period) {
+    my ($OldPeriod) = $Period;
+    my ($CalMonth,$CalDay);
+    $Period .= '-01' if ($Type eq 'month');
+    $CalDay   = substr ($Period, -2);
+    $CalMonth = substr ($Period, 5, 2);
+    if ($CalMonth < 1 or $CalMonth > 12 or $CalDay < 1 or $CalDay > 31) {
       $CalMonth = '12' if $CalMonth > 12;
       $CalMonth = '01' if $CalMonth < 1;
-      substr($Month, -2) = $CalMonth;
-      &Bleat(1,sprintf("'%s' is an invalid date (MM must be between '01' ".
-                       "and '12'), set to '%s'.",$OldMonth,$Month));
+      substr($Period, 5, 2) = $CalMonth;
+      $CalDay = '01' if $CalDay < 1;
+      $CalDay = '31' if $CalDay > 31;
+      # FIXME! - month with less than 31 days ...
+      substr($Period, -2) = $CalDay;
+      &Bleat(1,sprintf("'%s' is an invalid date, set to '%s'.",
+                       $OldPeriod,$Period));
     }
+    $Period = substr($Period,0,7) if ($Type eq 'month');
   }
-  return @Month;
+  return @Period;
 };
 
 ################################################################################
 sub SplitPeriod {
 ################################################################################
-### split a time period denoted by YYYY-MM:YYYY-MM into start and end month
+### split a time period denoted by YYYY-MM(-DD):YYYY-MM(-DD) into start and end
 ### IN : $Period: time period
-### OUT: $StartMonth, $EndMonth
-  my ($Period) = @_;
-  my ($StartMonth, $EndMonth) = split /:/, $Period;
-  ($StartMonth,$EndMonth) = CheckMonth($StartMonth,$EndMonth);
+###      $Type  : may be 'month' or 'day'
+### OUT: $StartTime, $EndTime
+  my ($Period,$Type) = @_;
+  my ($StartTime, $EndTime) = split /:/, $Period;
+  ($StartTime,$EndTime) = CheckPeriod($Type,$StartTime,$EndTime);
   # switch parameters as necessary
-  if ($EndMonth gt $StartMonth) {
-    return ($StartMonth, $EndMonth);
+  if ($EndTime gt $StartTime) {
+    return ($StartTime, $EndTime);
   } else {
-    return ($EndMonth, $StartMonth);
+    return ($EndTime, $StartTime);
   };
 };
 
