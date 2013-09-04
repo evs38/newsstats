@@ -80,7 +80,7 @@ sub ShowVersion {
 ################################################################################
 ### display version and exit
   print "NewsStats v$PackageVersion\n$MyVersion\n";
-  print "Copyright (c) 2010-2012 Thomas Hochstein <thh\@inter.net>\n";
+  print "Copyright (c) 2010-2013 Thomas Hochstein <thh\@inter.net>\n";
   print "This program is free software; you may redistribute it ".
         "and/or modify it under the same terms as Perl itself.\n";
   exit(100);
