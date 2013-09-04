@@ -258,11 +258,32 @@ See L<doc/README>.
 
 =head1 DESCRIPTION
 
-...
+This script will parse raw, unstructured headers from a database table which is
+fed from F<feedlog.pl> for a given time period and write its results to
+nother database table with separate fields (columns) for most (or even all)
+relevant headers.
+
+I<Subject:>, I<From:>, I<Sender:> and I<Reply-To:> will be parsed from MIME
+encoded words to UTF-8 as needed while the unparsed copy is kept. From that
+parsed copy, I<From:>, I<Sender:> and I<Reply-To:> will also be split into
+separate name(s) and address(es) fields while the un-splitted copy is kept,
+too.
+
+B<parsedb> should be run nightly from cron for yesterdays data so all
+other scripts get current information. The time period to act on defaults to
+yesterday, accordingly; you can assign another time period or a single day via
+the B<--day> option (see below).
 
 =head2 Configuration
 
-...
+B<parsedb> will read its configuration from F<newsstats.conf>
+should be present in etc/ via Config::Auto or from a configuration file
+submitted by the B<--conffile> option.
+
+See L<doc/INSTALL> for an overview of possible configuration options.
+
+You can override configuration options via the B<--rawdb> and
+B<--parsedb> options, respectively.
 
 =head1 OPTIONS
 
@@ -313,7 +334,13 @@ See L<doc/INSTALL>.
 
 =head1 EXAMPLES
 
-...
+An example crontab entry:
+
+    0 1 * * * /path/to/bin/parsedb.pl
+
+Do a dry run for yesterday's data, showing results of processing:
+
+    parsedb --debug --test | less
 
 =head1 FILES
 
