@@ -210,7 +210,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [--conffile I<filename>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 

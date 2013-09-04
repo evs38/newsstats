@@ -256,7 +256,7 @@ install - installation script
 
 =head1 SYNOPSIS
 
-B<install> [B<-Vh> [--update I<version>] [--conffile I<filename>]
+B<install> [B<-Vh> [--update I<version>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 

@@ -153,7 +153,7 @@ feedlog - log data from an INN feed to a database
 
 =head1 SYNOPSIS
 
-B<feedlog> [B<-Vhdq>] [--conffile I<filename>]
+B<feedlog> [B<-Vhdq>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 

@@ -277,7 +277,7 @@ groupstats - create reports on newsgroup usage
 
 =head1 SYNOPSIS
 
-B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>] [--conffile I<filename>]
+B<groupstats> [B<-Vhcs> B<--comments>] [B<-m> I<YYYY-MM>[:I<YYYY-MM>] | I<all>] [B<-n> I<newsgroup(s)>] [B<--checkgroups> I<checkgroups file>] [B<-r> I<report type>] [B<-l> I<lower boundary>] [B<-u> I<upper boundary>] [B<-b> I<boundary type>] [B<-g> I<group by>] [B<-o> I<order by>] [B<-f> I<output format>] [B<--filetemplate> I<filename template>] [B<--groupsdb> I<database table>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 
