@@ -130,12 +130,19 @@ $DBQuery->execute()
 binmode(STDOUT, ":utf8");
 $DBHandle->do("SET NAMES 'utf8'");
 
+# create a list of supported encondings
+my %LegalEncodings;
+foreach (Encode->encodings()) {
+  $LegalEncodings{$_} = 1;
+}
 # parse data in a loop and write it out
 print "-------------- Parsing data ... -------------\n" if $OptDebug;
 while (my $HeadersR = $DBQuery->fetchrow_hashref) {
   my %Headers = %{$HeadersR};
 
   # parse $Headers{'headers'} ('headers' from DBTableRaw)
+  # remove empty lines (that should not even exist in a header!)
+  $Headers{'headers'} =~ s/\n\s*\n/\n/g;
   # merge continuation lines
   # from Perl Cookbook, 1st German ed. 1999, pg. 91
   $Headers{'headers'} =~ s/\n\s+/ /g;
@@ -143,9 +150,29 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
   my $OtherHeaders;
   for (split(/\n/,$Headers{'headers'})) {
     # split header lines in header name and header content
-    my ($key,$value) = split(/:/,$_,2);
-    $key =~ s/\s*//;
-    $value =~ s/^\s*(.+)\s*$/$1/;
+    my ($key,$value);
+    if ($_ =~ /:/) {
+      ($key,$value) = split(/:/,$_,2);
+      $key =~ s/\s*//;
+      $value =~ s/^\s*(.+)\s*$/$1/;
+    } else {
+      &Bleat(1,sprintf("Illegal header line in %s.%s id %s: %s",
+                       $Conf{'DBDatabase'}, $Conf{'DBTableRaw'},
+                       $Headers{'id'},$_));
+      next;
+    }
+    # check for empty (mandatory) fields from DBTableRaw
+    # and set them from $Headers{'headers', if necessary
+    if (lc($key) =~ /^(message-id|path|newsgroups)$/) {
+      my $HeaderName = lc($key);
+      $HeaderName    = 'mid' if ($HeaderName eq 'message-id');
+      if (!defined($Headers{$HeaderName}) or $Headers{$HeaderName} eq '') {
+        $Headers{$HeaderName} = $value;
+        &Bleat(1,sprintf("Taking missing %s from 'headers' in %s.%s id %s.",
+                         $HeaderName, $Conf{'DBDatabase'}, $Conf{'DBTableRaw'},
+                         $Headers{'id'}));
+      }
+    }
     # save each header, separate database fields in %Headers,
     # the rest in $OtherHeaders (but not Message-ID, Path, Peer
     # and Newsgroups as those do already exist)
@@ -166,7 +193,10 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
       $HeaderName  =~ s/_$//;
       # decode From: / Sender: / Reply-To: / Subject:
       if ($Headers{$_} =~ /\?(B|Q)\?/) {
-        $Headers{$HeaderName.'_parsed'} = decode('MIME-Header',$Headers{$_});
+        # check for legal encoding and decode
+        (my $Encoding) = $Headers{$_} =~ /\?([^?]+)\?(B|Q)\?/;
+        $Headers{$HeaderName.'_parsed'} = decode('MIME-Header',$Headers{$_})
+          if (exists($LegalEncodings{$Encoding}));
       }
       # extract name(s) and mail(s) from From: / Sender: / Reply-To:
       # in parsed form, if available
