@@ -140,8 +140,8 @@ $OptGroupBy = 'newsgroup' if (!$OptGroupBy and
                               $OptBoundType and $OptBoundType ne 'default');
 # default to 'newsgroup' if $OptGroupBy is not set and
 # just one newsgroup is requested, but more than one month
-$OptGroupBy = 'newsgroup' if (!$OptGroupBy and
-                              $OptMonth =~ /:/ and $OptNewsgroups !~ /[:*%]/);
+$OptGroupBy = 'newsgroup' if (!$OptGroupBy and $OptMonth and $OptMonth =~ /:/
+                              and $OptNewsgroups and $OptNewsgroups !~ /[:*%]/);
 # parse $OptGroupBy to $GroupBy, create ORDER BY clause $SQLOrderClause
 # if $OptGroupBy is still not set, SQLSortOrder() will default to 'month'
 my ($GroupBy,$SQLOrderClause) = SQLSortOrder($OptGroupBy, $OptOrderBy);
