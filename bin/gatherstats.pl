@@ -3,7 +3,7 @@
 # gatherstats.pl
 #
 # This script will gather statistical information from a database
-# containing headers and other information from a INN feed.
+# containing headers and other information from an INN feed.
 #
 # It is part of the NewsStats package.
 #
@@ -38,7 +38,7 @@ my %LegalStats;
 
 ### read commandline options
 my ($OptCheckgroupsFile,$OptClientsDB,$OptDebug,$OptGroupsDB,$OptTLH,
-    $OptHostsDB,$OptMonth,$OptRawDB,$OptStatsType,$OptTest,$OptConfFile);
+    $OptHostsDB,$OptMonth,$OptParseDB,$OptStatsType,$OptTest,$OptConfFile);
 GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
             'clientsdb=s'     => \$OptClientsDB,
             'd|debug!'        => \$OptDebug,
@@ -46,7 +46,7 @@ GetOptions ('c|checkgroups=s' => \$OptCheckgroupsFile,
             'hierarchy=s'     => \$OptTLH,
             'hostsdb=s'       => \$OptHostsDB,
             'm|month=s'       => \$OptMonth,
-            'rawdb=s'         => \$OptRawDB,
+            'parsedb=s'       => \$OptParseDB,
             's|stats=s'       => \$OptStatsType,
             't|test!'         => \$OptTest,
             'conffile=s'      => \$OptConfFile,
@@ -58,7 +58,7 @@ my %Conf = %{ReadConfig($OptConfFile)};
 
 ### override configuration via commandline options
 my %ConfOverride;
-$ConfOverride{'DBTableRaw'}   = $OptRawDB if $OptRawDB;
+$ConfOverride{'DBTableParse'} = $OptParseDB if $OptParseDB;
 $ConfOverride{'DBTableGrps'}  = $OptGroupsDB if $OptGroupsDB;
 $ConfOverride{'DBTableClnts'} = $OptClientsDB if $OptClientsDB;
 $ConfOverride{'DBTableHosts'} = $OptHostsDB if $OptHostsDB;
@@ -124,15 +124,15 @@ foreach my $Month (&ListMonth($Period)) {
 
     ### ----------------------------------------------
     ### get groups data (number of postings per group)
-    # get groups data from raw table for given month
+    # get groups data from parsed table for given month
     my $DBQuery = $DBHandle->prepare(sprintf("SELECT newsgroups FROM %s.%s ".
                                              "WHERE day LIKE ? AND NOT disregard",
                                              $Conf{'DBDatabase'},
-                                             $Conf{'DBTableRaw'}));
+                                             $Conf{'DBTableParse'}));
     $DBQuery->execute($Month.'-%')
       or &Bleat(2,sprintf("Can't get groups data for %s from %s.%s: ".
                           "$DBI::errstr\n",$Month,
-                          $Conf{'DBDatabase'},$Conf{'DBTableRaw'}));
+                          $Conf{'DBDatabase'},$Conf{'DBTableParse'}));
 
     # count postings per group
     my %Postings;
@@ -206,11 +206,11 @@ __END__
 
 =head1 NAME
 
-gatherstats - process statistical data from a raw source
+gatherstats - process statistical data from a parsed source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [--conffile I<filename>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--parsedb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [--conffile I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -219,7 +219,7 @@ See L<doc/README>.
 =head1 DESCRIPTION
 
 This script will extract and process statistical information from a
-database table which is fed from F<feedlog.pl> for a given time period
+database table which is filled from F<parsedb.pl> for a given time period
 and write its results to (an)other database table(s). Entries marked
 with I<'disregard'> in the database will be ignored; currently, you
 have to set this flag yourself, using your database management tools.
@@ -266,7 +266,7 @@ which should be present in the same directory via Config::Auto.
 See L<doc/INSTALL> for an overview of possible configuration options.
 
 You can override configuration options via the B<--hierarchy>,
-B<--rawdb>, B<--groupsdb>, B<--clientsdb> and B<--hostsdb> options,
+B<--parsedb>, B<--groupsdb>, B<--clientsdb> and B<--hostsdb> options,
 respectively.
 
 =head1 OPTIONS
@@ -327,9 +327,9 @@ will be added with a count of 0 (and logged to STDERR).
 
 Override I<TLH> from F<newsstats.conf>.
 
-=item B<--rawdb> I<table> (raw data table)
+=item B<--parsedb> I<table> (parsed data table)
 
-Override I<DBTableRaw> from F<newsstats.conf>.
+Override I<DBTableParse> from F<newsstats.conf>.
 
 =item B<--groupsdb> I<table> (postings per group table)
 
