@@ -180,19 +180,24 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
         } else {
           @Address = Mail::Address->parse($Headers{$_});
         }
-        # split each Mail::Address object
+        # split each Mail::Address object to @Names and @Adresses
+        my (@Names,@Adresses);
         foreach (@Address) {
-          # take address part
-          $Headers{$HeaderName.'_address'} = $_->address();
+          # take address part in @Addresses
+          push (@Adresses, $_->address());
           # take name part form "phrase", if there is one:
           # From: My Name <addr@ess> (Comment)
           # otherwise, take it from "comment":
           # From: addr@ess (Comment)
-          $Headers{$HeaderName.'_name'} = $_->comment()
-            unless $Headers{$HeaderName.'_name'}= $_->phrase;
-          $Headers{$HeaderName.'_name'} =~ s/^\((.+)\)$/$1/;
-          # FIMXE - handle more than one Mail::Address object!
+          # and push it in @Names
+          my ($Name);
+          $Name = $_->comment() unless $Name = $_->phrase;
+          $Name =~ s/^\((.+)\)$/$1/;
+          push (@Names, $Name);
         }
+        # put all @Adresses and all @Names in %Headers as comma separated lists
+        $Headers{$HeaderName.'_address'} = join(', ',@Adresses);
+        $Headers{$HeaderName.'_name'}    = join(', ',@Names);
       }
     }
   }
