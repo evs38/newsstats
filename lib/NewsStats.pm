@@ -49,8 +49,8 @@ require Exporter;
                  Output      => [qw(OutputData FormatOutput)],
                  SQLHelper   => [qw(SQLHierarchies SQLSortOrder SQLGroupList
                                  SQLSetBounds SQLBuildClause GetMaxLength)]);
-$VERSION = '0.01';
-our $PackageVersion = '0.01';
+$VERSION = '0.02';
+our $PackageVersion = '0.02';
 
 use Data::Dumper;
 use File::Basename;

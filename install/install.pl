@@ -12,7 +12,7 @@
 # which Perl itself is published.
 
 BEGIN {
-  our $VERSION = "0.01";
+  our $VERSION = "0.02";
   use File::Basename;
   # we're in .../install, so our module is in ../lib
   push(@INC, dirname($0).'/../lib');
