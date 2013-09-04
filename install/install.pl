@@ -22,8 +22,6 @@ use warnings;
 
 use NewsStats qw(:DEFAULT);
 
-use Cwd;
-
 use DBI;
 use Getopt::Long qw(GetOptions);
 Getopt::Long::config ('bundling');
@@ -36,10 +34,6 @@ GetOptions ('u|update=s' => \$OptUpdate,
             'conffile=s' => \$OptConfFile,
             'h|help'     => \&ShowPOD,
             'V|version'  => \&ShowVersion) or exit 1;
-
-### change working directory to .. (as we're in .../install)
-chdir dirname($FullPath).'/..';
-my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
@@ -109,7 +103,7 @@ Things left to do:
           ## gather statistics for NewsStats
           newsstats!\\
                   :!*,de.*\\
-                  :Tc,WmtfbsPNH,Ac:$Path/feedlog.pl
+                  :Tc,WmtfbsPNH,Ac:$HomePath/bin/feedlog.pl
 
       Please
 
