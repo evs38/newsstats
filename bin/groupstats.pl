@@ -342,7 +342,8 @@ Captions and comments are automatically disabled in this case.
 =head2 Configuration
 
 B<groupstats> will read its configuration from F<newsstats.conf>
-which should be present in the same directory via Config::Auto.
+which should be present in etc/ via Config::Auto or from a configuration file
+submitted by the B<--conffile> option.
 
 See doc/INSTALL for an overview of possible configuration options.
 

@@ -261,7 +261,8 @@ override that default through the B<--groupsdb> option.
 =head2 Configuration
 
 B<gatherstats> will read its configuration from F<newsstats.conf>
-which should be present in the same directory via Config::Auto.
+which should be present in etc/ via Config::Auto or from a configuration file
+submitted by the B<--conffile> option.
 
 See L<doc/INSTALL> for an overview of possible configuration options.
 

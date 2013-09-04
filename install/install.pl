@@ -268,8 +268,9 @@ This script will create database tables as necessary and configured.
 
 =head2 Configuration
 
-B<install> will read its configuration from F<newsstats.conf> via
-Config::Auto.
+B<install> will read its configuration from F<newsstats.conf> which should
+be present in etc/ via Config::Auto or from a configuration file submitted
+by the B<--conffile> option.
 
 See L<doc/INSTALL> for an overview of possible configuration options.
 
