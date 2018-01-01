@@ -13,7 +13,7 @@
 # which Perl itself is published.
 
 BEGIN {
-  our $VERSION = "0.01";
+  our $VERSION = "0.02";
   use File::Basename;
   # we're in .../bin, so our module is in ../lib
   push(@INC, dirname($0).'/../lib');
@@ -153,7 +153,7 @@ feedlog - log data from an INN feed to a database
 
 =head1 SYNOPSIS
 
-B<feedlog> [B<-Vhdq>] [--conffile I<filename>]
+B<feedlog> [B<-Vhdq>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -174,7 +174,8 @@ terminating would only result in a rapid respawn.
 =head2 Configuration
 
 B<feedlog> will read its configuration from F<newsstats.conf> which
-should be present in the same directory via Config::Auto.
+should be present in etc/ via Config::Auto or from a configuration file
+submitted by the B<--conffile> option.
 
 See L<doc/INSTALL> for an overview of possible configuration options.
 
@@ -265,7 +266,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.

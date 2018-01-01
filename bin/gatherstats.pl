@@ -13,7 +13,7 @@
 # which Perl itself is published.
 
 BEGIN {
-  our $VERSION = "0.01";
+  our $VERSION = "0.02";
   use File::Basename;
   # we're in .../bin, so our module is in ../lib
   push(@INC, dirname($0).'/../lib');
@@ -210,7 +210,7 @@ gatherstats - process statistical data from a raw source
 
 =head1 SYNOPSIS
 
-B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [--conffile I<filename>]
+B<gatherstats> [B<-Vhdt>] [B<-m> I<YYYY-MM> | I<YYYY-MM:YYYY-MM>] [B<-s> I<stats>] [B<-c> I<filename template>]] [B<--hierarchy> I<TLH>] [B<--rawdb> I<database table>] [B<-groupsdb> I<database table>] [B<--clientsdb> I<database table>] [B<--hostsdb> I<database table>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -261,7 +261,8 @@ override that default through the B<--groupsdb> option.
 =head2 Configuration
 
 B<gatherstats> will read its configuration from F<newsstats.conf>
-which should be present in the same directory via Config::Auto.
+which should be present in etc/ via Config::Auto or from a configuration file
+submitted by the B<--conffile> option.
 
 See L<doc/INSTALL> for an overview of possible configuration options.
 
@@ -417,7 +418,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.

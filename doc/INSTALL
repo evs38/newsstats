@@ -28,21 +28,21 @@ INSTALLATION INSTRUCTIONS
    * Copy the sample configuration file newsstats.conf.sample to
      newsstats.conf and modify it for your purposes:
 
-     # cp newsstats.conf.sample newsstats.conf
-     # vim newsstats.conf
+     # cp etc/newsstats.conf.sample etc/newsstats.conf
+     # vim etc/newsstats.conf
 
    a) Mandatory configuration options
 
    * DBDriver = mysql
      Database driver used; currently only mysql is supported.
- 
+
    * DBHost = localhost
      The host your mysql server is running on.
 
    * DBUser =
      The username to connect to the database server.
 
-   * DBPw = 
+   * DBPw =
      Matching password for your username.
 
    * DBDatabase = newsstats
@@ -61,17 +61,17 @@ INSTALLATION INSTRUCTIONS
 
    * TLH = de
      Limit examination to that top-level hierarchy.
-     
+
 3) Database (mysql) setup
 
    * Setup your database server with a username, password and
      database matching the NewsStats configuration (see 2 a).
 
    * Start the installation script:
-     
+
      # install/install.pl
 
-     It will setup the necessary database tables and display some 
+     It will setup the necessary database tables and display some
      information on the next steps.
 
 4) Feed (INN) setup

@@ -12,7 +12,7 @@
 # which Perl itself is published.
 
 BEGIN {
-  our $VERSION = "0.01";
+  our $VERSION = "0.02";
   use File::Basename;
   # we're in .../install, so our module is in ../lib
   push(@INC, dirname($0).'/../lib');
@@ -21,8 +21,6 @@ use strict;
 use warnings;
 
 use NewsStats qw(:DEFAULT);
-
-use Cwd;
 
 use DBI;
 use Getopt::Long qw(GetOptions);
@@ -36,10 +34,6 @@ GetOptions ('u|update=s' => \$OptUpdate,
             'conffile=s' => \$OptConfFile,
             'h|help'     => \&ShowPOD,
             'V|version'  => \&ShowVersion) or exit 1;
-
-### change working directory to .. (as we're in .../install)
-chdir dirname($FullPath).'/..';
-my $Path = cwd();
 
 ### read configuration
 print("Reading configuration.\n");
@@ -109,7 +103,7 @@ Things left to do:
           ## gather statistics for NewsStats
           newsstats!\\
                   :!*,de.*\\
-                  :Tc,WmtfbsPNH,Ac:$Path/feedlog.pl
+                  :Tc,WmtfbsPNH,Ac:$HomePath/bin/feedlog.pl
 
       Please
 
@@ -256,7 +250,7 @@ install - installation script
 
 =head1 SYNOPSIS
 
-B<install> [B<-Vh> [--update I<version>] [--conffile I<filename>]
+B<install> [B<-Vh> [--update I<version>] [B<--conffile> I<filename>]
 
 =head1 REQUIREMENTS
 
@@ -268,8 +262,9 @@ This script will create database tables as necessary and configured.
 
 =head2 Configuration
 
-B<install> will read its configuration from F<newsstats.conf> via
-Config::Auto.
+B<install> will read its configuration from F<newsstats.conf> which should
+be present in etc/ via Config::Auto or from a configuration file submitted
+by the B<--conffile> option.
 
 See L<doc/INSTALL> for an overview of possible configuration options.
 
@@ -340,7 +335,7 @@ Thomas Hochstein <thh@inter.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2010-2012 Thomas Hochstein <thh@inter.net>
+Copyright (c) 2010-2013 Thomas Hochstein <thh@inter.net>
 
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.

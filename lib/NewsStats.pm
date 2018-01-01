@@ -49,8 +49,8 @@ require Exporter;
                  Output      => [qw(OutputData FormatOutput)],
                  SQLHelper   => [qw(SQLHierarchies SQLSortOrder SQLGroupList
                                  SQLSetBounds SQLBuildClause GetMaxLength)]);
-$VERSION = '0.01';
-our $PackageVersion = '0.01';
+$VERSION = '0.02';
+our $PackageVersion = '0.02';
 
 use Data::Dumper;
 use File::Basename;
@@ -80,7 +80,7 @@ sub ShowVersion {
 ################################################################################
 ### display version and exit
   print "NewsStats v$PackageVersion\n$MyVersion\n";
-  print "Copyright (c) 2010-2012 Thomas Hochstein <thh\@inter.net>\n";
+  print "Copyright (c) 2010-2013 Thomas Hochstein <thh\@inter.net>\n";
   print "This program is free software; you may redistribute it ".
         "and/or modify it under the same terms as Perl itself.\n";
   exit(100);
