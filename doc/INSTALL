@@ -13,6 +13,8 @@ INSTALLATION INSTRUCTIONS
 
 1) Install the scripts
 
+   * Get INN, mysql, Perl, and the necessary modules installed (see README).
+
    * Download the current version of NewsStats from
      <http://th-h.de/download/scripts.php>.
 
