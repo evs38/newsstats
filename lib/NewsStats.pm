@@ -674,7 +674,7 @@ sub SQLSetBounds {
 ### OUT: SQL code to become part of a WHERE or HAVING clause
   my ($Type,$LowBound,$UppBound) = @_;
   ($LowBound,$UppBound) = SQLCheckNumber($LowBound,$UppBound);
-  if($LowBound and $UppBound and $LowBound > $UppBound) {
+  if($LowBound and defined($UppBound) and $LowBound > $UppBound) {
     &Bleat(1,"Lower boundary $LowBound is larger than Upper boundary ".
              "$UppBound, exchanging boundaries.");
     ($LowBound,$UppBound) = ($UppBound,$LowBound);
@@ -690,7 +690,7 @@ sub SQLSetBounds {
   } elsif ($Type eq 'sum') {
     $WhereHavingFunction = 'SUM(postings)'
   }
-  $LowBound = sprintf('%s >= '.$LowBound,$WhereHavingFunction) if ($LowBound);
+  $LowBound = sprintf('%s >= '.$LowBound,$WhereHavingFunction) if defined($LowBound);
   # set $LowBound to SQL statement:
   # 'WHERE postings <=', 'HAVING MAX(postings) <=' or 'HAVING AVG(postings) <='
   if ($Type eq 'level') {
@@ -700,7 +700,7 @@ sub SQLSetBounds {
   } elsif ($Type eq 'sum') {
     $WhereHavingFunction = 'SUM(postings)'
   }
-  $UppBound = sprintf('%s <= '.$UppBound,$WhereHavingFunction) if ($UppBound);
+  $UppBound = sprintf('%s <= '.$UppBound,$WhereHavingFunction) if defined($UppBound);
   return ($LowBound,$UppBound);
 };
 
