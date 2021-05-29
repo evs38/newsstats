@@ -198,6 +198,11 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
         $Headers{$HeaderName.'_parsed'} = decode('MIME-Header',$Headers{$_})
           if (exists($LegalEncodings{$Encoding}));
       }
+      # forcibly modify headers with un-encoded 8bit data assuming utf-8
+      # TODO: try to guess correct enconding
+      elsif ($Headers{$_} =~ /[^\x00-\x7F]/) {
+        $Headers{$_} = decode('utf-8',$Headers{$_});
+      }
       # extract name(s) and mail(s) from From: / Sender: / Reply-To:
       # in parsed form, if available
       if ($_ ne 'subject') {
@@ -258,9 +263,9 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
                                        split(/ /,'? ' x scalar(@DBFields)))
                                 ));
   $DBWrite->execute(@SQLBindVars)
-      or &Bleat(2,sprintf("Can't write parsed data for %s to %s.%s: ".
+      or &Bleat(2,sprintf("Can't write parsed data for %s to %s.%s for %s: ".
                           "$DBI::errstr\n",$Period,
-                          $Conf{'DBDatabase'},$Conf{'DBTableParse'}));
+                          $Conf{'DBDatabase'},$Conf{'DBTableParse'}, $Headers{'mid'}));
     $DBWrite->finish;
   }
 };
