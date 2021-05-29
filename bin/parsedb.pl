@@ -258,9 +258,9 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
                                        split(/ /,'? ' x scalar(@DBFields)))
                                 ));
   $DBWrite->execute(@SQLBindVars)
-      or &Bleat(2,sprintf("Can't write parsed data for %s to %s.%s: ".
+      or &Bleat(2,sprintf("Can't write parsed data for %s to %s.%s for %s: ".
                           "$DBI::errstr\n",$Period,
-                          $Conf{'DBDatabase'},$Conf{'DBTableParse'}));
+                          $Conf{'DBDatabase'},$Conf{'DBTableParse'}, $Headers{'mid'}));
     $DBWrite->finish;
   }
 };
