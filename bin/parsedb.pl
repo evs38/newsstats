@@ -198,6 +198,11 @@ while (my $HeadersR = $DBQuery->fetchrow_hashref) {
         $Headers{$HeaderName.'_parsed'} = decode('MIME-Header',$Headers{$_})
           if (exists($LegalEncodings{$Encoding}));
       }
+      # forcibly modify headers with un-encoded 8bit data assuming utf-8
+      # TODO: try to guess correct enconding
+      elsif ($Headers{$_} =~ /[^\x00-\x7F]/) {
+        $Headers{$_} = decode('utf-8',$Headers{$_});
+      }
       # extract name(s) and mail(s) from From: / Sender: / Reply-To:
       # in parsed form, if available
       if ($_ ne 'subject') {
